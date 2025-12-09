@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { ThemeProvider } from '@mui/material/styles';
-import theme from '../theme';
+import theme from '../theme/theme';
 import '../styles/globals.css';
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Rekapitulasi Data",
+  title: "Rekapitulasi Data",
+  description: "Website Rekapitulasi Data Pasien",
 };
 
 const poppins = Poppins({
@@ -18,14 +18,14 @@ const poppins = Poppins({
   fallback: ["Helvetica", "Arial", "sans-serif"],
 });
 
-export default function RootLayout(props) {
+export default function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props;
   return (
     <html lang="en" className={poppins.className}>
       <body>
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
-            {children}
+              {children}
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>
