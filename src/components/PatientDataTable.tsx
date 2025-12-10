@@ -22,10 +22,12 @@ import {
   FormControl,
   InputLabel,
   Button,
+  Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { Patient } from "@/types/patient";
 
 interface PatientDataTableProps {
@@ -140,8 +142,42 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
 
   return (
     <Box>
+      {/* Table Header Section */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Button
+          variant="contained"
+          startIcon={
+            <Box component="span" sx={{ fontSize: "1.2em" }}>
+              +
+            </Box>
+          }
+          sx={{
+            backgroundColor: "#696CFF",
+            "&:hover": { backgroundColor: "#5f61e6" },
+            boxShadow: "0 2px 4px 0 rgba(105, 108, 255, 0.4)",
+            px: 3,
+          }}
+        >
+          ADD DATA
+        </Button>
+      </Box>
+
       {/* Search and Filter Controls */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      <Paper
+        sx={{
+          p: 2,
+          mb: 2,
+          borderRadius: 2,
+          boxShadow: "0 2px 6px 0 rgba(67, 89, 113, 0.12)",
+        }}
+      >
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
@@ -174,7 +210,7 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
           />
 
           {/* Filter Column */}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 200 } }}>
             <InputLabel>Filter Kolom</InputLabel>
             <Select
               value={filterColumn}
@@ -191,7 +227,7 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
               }
             >
               <MenuItem value="">
-                <em>Tidak ada</em>
+                <strong>Tidak ada</strong>
               </MenuItem>
               {columns.map((col) => (
                 <MenuItem key={col} value={col}>
@@ -203,7 +239,10 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
 
           {/* Filter Value */}
           {filterColumn && (
-            <FormControl size="small" sx={{ minWidth: 200 }}>
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", md: 200 } }}
+            >
               <InputLabel>Nilai Filter</InputLabel>
               <Select
                 value={filterValue}
@@ -214,7 +253,7 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
                 }}
               >
                 <MenuItem value="">
-                  <em>Semua</em>
+                  <strong>Semua</strong>
                 </MenuItem>
                 {getUniqueValues(filterColumn).map((value) => (
                   <MenuItem key={value} value={value}>
@@ -232,6 +271,7 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
               size="small"
               onClick={handleClearFilters}
               startIcon={<ClearIcon />}
+              sx={{ width: { xs: "100%", md: "auto" } }}
             >
               Reset
             </Button>
@@ -274,47 +314,100 @@ export default function PatientDataTable({ data }: PatientDataTableProps) {
       </Paper>
 
       {/* Data Table */}
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>
-                <strong>No</strong>
-              </TableCell>
-              {columns.map((column) => (
-                <TableCell key={column}>
-                  <TableSortLabel
-                    active={sortColumn === column}
-                    direction={sortColumn === column ? sortDirection : "asc"}
-                    onClick={() => handleSort(column)}
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: 2,
+          overflow: "hidden",
+          boxShadow: "0 2px 6px 0 rgba(67, 89, 113, 0.12)",
+        }}
+      >
+        <Box sx={{ overflowX: "auto", width: "100%" }}>
+          <Table sx={{ minWidth: 650 }} size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: "#eeeeee" }}>
+                <TableCell
+                  width={50}
+                  sx={{ fontWeight: 700, color: "black", py: 2 }}
+                >
+                  NO
+                </TableCell>
+                {columns.map((column) => (
+                  <TableCell
+                    key={column}
+                    sx={{
+                      fontWeight: 700,
+                      color: "black",
+                      whiteSpace: "nowrap",
+                      py: 2,
+                    }}
                   >
-                    <strong>{column}</strong>
-                  </TableSortLabel>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + 1} align="center">
-                  Tidak ada data yang sesuai
-                </TableCell>
+                    <TableSortLabel
+                      active={true}
+                      direction={sortColumn === column ? sortDirection : "asc"}
+                      onClick={() => handleSort(column)}
+                      IconComponent={ArrowDownwardIcon}
+                      sx={{
+                        color: "black !important",
+                        "& .MuiTableSortLabel-icon": {
+                          opacity: sortColumn === column ? 1 : 0.3,
+                          transition: "opacity 0.2s",
+                          color: "black !important",
+                        },
+                        "&:hover .MuiTableSortLabel-icon": {
+                          opacity: 1,
+                        },
+                        "&.Mui-active": {
+                          color: "black",
+                        },
+                      }}
+                    >
+                      {column}
+                    </TableSortLabel>
+                  </TableCell>
+                ))}
               </TableRow>
-            ) : (
-              paginatedData.map((row, index) => (
-                <TableRow key={row.id || index} hover>
-                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                  {columns.map((column) => (
-                    <TableCell key={column}>
-                      {String(row[column] || "-")}
-                    </TableCell>
-                  ))}
+            </TableHead>
+            <TableBody>
+              {paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length + 1}
+                    align="center"
+                    sx={{ py: 4 }}
+                  >
+                    <Box
+                      display="flex"
+                      flexDirection="column"
+                      alignItems="center"
+                    >
+                      <Typography color="text.secondary">
+                        Tidak ada data yang sesuai
+                      </Typography>
+                    </Box>
+                  </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                paginatedData.map((row, index) => (
+                  <TableRow
+                    key={row.id || index}
+                    hover
+                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                  >
+                    <TableCell sx={{ color: "black" }}>
+                      {page * rowsPerPage + index + 1}
+                    </TableCell>
+                    {columns.map((column) => (
+                      <TableCell key={column} sx={{ color: "black", py: 1.5 }}>
+                        {String(row[column] || "-")}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Box>
       </TableContainer>
 
       {/* Pagination */}

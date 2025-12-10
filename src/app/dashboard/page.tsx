@@ -72,7 +72,7 @@ export default function DashboardPage() {
               overflow: "hidden",
             }}
           >
-            <CardContent sx={{ p: 3 }}>
+            <CardContent sx={{ p: 4 }}>
               <Box
                 display="flex"
                 justifyContent="space-between"
@@ -95,7 +95,7 @@ export default function DashboardPage() {
               </Box>
 
               <Typography
-                variant="h3"
+                variant="h4"
                 fontWeight="bold"
                 sx={{ mb: 0.5, color: "#111827" }}
               >
