@@ -142,7 +142,7 @@ export default function DashboardPage() {
             <Typography variant="h5" fontWeight="bold" gutterBottom>
               Pusat Tindakan
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body1" color="text.secondary">
               Akses cepat ke fitur-fitur penting
             </Typography>
           </Box>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
               bgcolor: "#F9FAFB",
             }}
           >
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body1" color="text.secondary">
               Fitur lainnya akan segera hadir
             </Typography>
           </Box>

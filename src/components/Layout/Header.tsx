@@ -47,7 +47,7 @@ export default function Header({
           variant="h6"
           noWrap
           component="div"
-          sx={{ flexGrow: 1, fontWeight: 500 }}
+          sx={{ flexGrow: 1, fontWeight: 600 }}
         >
           Dashboard Rekapitulasi Pasien
         </Typography>

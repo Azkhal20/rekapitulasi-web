@@ -11,27 +11,32 @@ export default function PatientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchPatientData();
-        setPatients(data);
-      } catch (err) {
-        console.error("Error loading patient data:", err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Gagal memuat data pasien. Pastikan Google Sheets dapat diakses dan API key valid."
-        );
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchPatientData();
+      setPatients(data);
+    } catch (err) {
+      console.error("Error loading patient data:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Gagal memuat data pasien. Pastikan Google Sheets dapat diakses dan API key valid."
+      );
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
+
+  const handleDataChange = () => {
+    // Reload data after CRUD operations
+    loadData();
+  };
 
   if (loading) {
     return (
@@ -95,19 +100,19 @@ export default function PatientsPage() {
     <Box>
       <Box mb={3}>
         <Typography
-          variant="h5"
+          variant="h4"
           gutterBottom
           fontWeight="bold"
           sx={{ color: "#111827" }}
         >
           Data Pasien
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body1" color="text.secondary">
           Total: {patients.length} pasien terdaftar
         </Typography>
       </Box>
 
-      <PatientDataTable data={patients} />
+      <PatientDataTable data={patients} onDataChange={handleDataChange} />
     </Box>
   );
 }
