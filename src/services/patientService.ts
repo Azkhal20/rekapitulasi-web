@@ -54,34 +54,35 @@ class PatientService {
     }
   }
 
-  // GET ALL
-  async getAllPatients(): Promise<PatientData[]> {
+  // GET ALL with SheetName Param
+  async getAllPatients(sheetName: string = "JANUARI"): Promise<PatientData[]> {
     try {
       this.checkUrl();
-      const url = `${this.baseUrl}?action=getAll&t=${Date.now()}`;
+      // Append sheetName to URL
+      const url = `${this.baseUrl}?action=getAll&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        // headers removed to avoid preflight CORS options request
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await this.parseResponse(response, 'getAll');
     } catch (error) {
-      console.error('Error fetching patients:', error);
+      console.error(`Error fetching patients (Sheet: ${sheetName}):`, error);
       throw error;
     }
   }
 
   // GET BY ID
-  async getPatientById(id: number): Promise<PatientData> {
+  async getPatientById(id: number, sheetName: string = "JANUARI"): Promise<PatientData> {
     try {
       this.checkUrl();
-      const url = `${this.baseUrl}?action=getById&id=${id}&t=${Date.now()}`;
+      const url = `${this.baseUrl}?action=getById&id=${id}&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        // headers removed to avoid preflight CORS options request
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -92,20 +93,23 @@ class PatientService {
     }
   }
 
-  // ADD (ID Offset not needed for Add)
-  async addPatient(patientData: Omit<PatientData, 'id'>): Promise<{ message: string }> {
+  // ADD (Pass sheetName in Body)
+  async addPatient(patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI"): Promise<{ message: string }> {
     try {
       this.checkUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
+      // Inject sheetName into body
+      const payload = { ...patientData, sheetName };
+
       const response = await fetch(`${this.baseUrl}?action=add`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(patientData),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain to avoid preflight
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
@@ -118,27 +122,27 @@ class PatientService {
     }
   }
 
-  // UPDATE (WITH HOTFIX +1 OFFSET)
-  async updatePatient(id: number, patientData: Omit<PatientData, 'id'>): Promise<{ message: string }> {
+  // UPDATE (Pass sheetName in Body, NO +1 HOTFIX)
+  async updatePatient(id: number, patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI"): Promise<{ message: string }> {
     try {
       this.checkUrl();
-      
-      // HOTFIX: Add +1 to ID to fix off-by-one error
-      const targetId = id + 1;
+      // REMOVED HOTFIX +1
       
       console.log('🔵 UPDATE Request');
-      console.log('Original ID from Table:', id);
-      console.log('Corrected ID sent to Server:', targetId);
+      console.log('Sheet:', sheetName);
+      console.log('ID:', id);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
+      const payload = { id: id, ...patientData, sheetName };
+
       const response = await fetch(`${this.baseUrl}?action=update`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ id: targetId, ...patientData }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
@@ -151,24 +155,24 @@ class PatientService {
     }
   }
 
-  // DELETE (WITH HOTFIX +1 OFFSET)
-  async deletePatient(id: number): Promise<{ message: string }> {
+  // DELETE (Pass sheetName in Body, NO +1 HOTFIX)
+  async deletePatient(id: number, sheetName: string = "JANUARI"): Promise<{ message: string }> {
     try {
       this.checkUrl();
-
-      // HOTFIX: Add +1 to ID to fix off-by-one error
-      const targetId = id + 1;
+      // REMOVED HOTFIX +1
 
       console.log('🔴 DELETE Request');
-      console.log('Original ID from Table:', id);
-      console.log('Corrected ID sent to Server:', targetId);
+      console.log('Sheet:', sheetName);
+      console.log('ID:', id);
       
+      const payload = { id: id, sheetName };
+
       const response = await fetch(`${this.baseUrl}?action=delete`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ id: targetId }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

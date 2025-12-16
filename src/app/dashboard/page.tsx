@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -7,36 +8,129 @@ import {
   Typography,
   Paper,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import WcIcon from "@mui/icons-material/Wc"; // Icon Gender
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Link from "next/link";
+import { patientService, PatientData } from "@/services/patientService";
 
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState({
+    totalPatients: 0,
+    todayPatients: 0,
+    genderRatio: { L: 0, P: 0 },
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        // Default fetching from NOVEMBER as per user preference
+        const data = await patientService.getAllPatients("NOVEMBER");
+
+        // Calculate Stats
+        const total = data.length;
+
+        // Today's Patients
+        const today = new Date();
+        // Reset time to verify date strictly
+        const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
+
+        // Helper to normalize sheet date "16 Des 2025" to "2025-12-16"
+        const parseDate = (d: string) => {
+          // If already YYYY-MM-DD
+          if (d.includes("-") && d.length === 10) return d;
+
+          // If Indonesian format "16 Des 2025" or similar
+          try {
+            // Basic check - if we can construct a date object
+            const dateObj = new Date(d);
+            if (!isNaN(dateObj.getTime())) {
+              return dateObj.toISOString().split("T")[0];
+            }
+          } catch (e) {
+            return "";
+          }
+          return "";
+        };
+
+        const todayCount = data.filter((p) => {
+          if (!p.TANGGAL) return false;
+          // Check if backend returns ISO or formatted.
+          // It typically returns "16 Des 2025" if display value used, or "2025-12-16" if raw.
+          // Let's maximize match chance.
+          const pDate = parseDate(p.TANGGAL);
+          return pDate === todayStr;
+        }).length;
+
+        // Gender Ratio
+        let countL = 0;
+        let countP = 0;
+        data.forEach((p) => {
+          const l = (p.L || "").toString().trim();
+          const valP = (p.P || "").toString().trim();
+
+          // Check if column L has "1" or "v" or anything truthy
+          if (l === "1" || l.toLowerCase() === "v" || l.toLowerCase() === "l")
+            countL++;
+          // Check if column P has "1" or "v"
+          if (
+            valP === "1" ||
+            valP.toLowerCase() === "v" ||
+            valP.toLowerCase() === "p"
+          )
+            countP++;
+        });
+
+        setStatsData({
+          totalPatients: total,
+          todayPatients: todayCount,
+          genderRatio: { L: countL, P: countP },
+        });
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
   const stats = [
     {
-      title: "Total Pasien",
-      value: "1,248",
+      title: "Total Pasien (November)",
+      value: loading ? "..." : statsData.totalPatients.toLocaleString(),
       icon: <PeopleIcon sx={{ fontSize: 32, color: "white" }} />,
       gradient: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-      trend: "+12% dari bulan lalu",
+      trend: "Data Realtime",
+      trendColor: "#4F46E5",
+      trendBg: "rgba(79, 70, 229, 0.1)",
     },
     {
-      title: "Data Harian",
-      value: "45",
+      title: "Kunjungan Hari Ini",
+      value: loading ? "..." : statsData.todayPatients.toLocaleString(),
       icon: <AssignmentIcon sx={{ fontSize: 32, color: "white" }} />,
       gradient: "linear-gradient(135deg, #EC4899 0%, #DB2777 100%)",
-      trend: "+5% dari kemarin",
+      trend: "Update Harian",
+      trendColor: "#DB2777",
+      trendBg: "rgba(236, 72, 153, 0.1)",
     },
     {
-      title: "Tingkat Akurasi",
-      value: "99.8%",
-      icon: <TrendingUpIcon sx={{ fontSize: 32, color: "white" }} />,
+      title: "Laki-laki vs Perempuan",
+      value: loading
+        ? "..."
+        : `L: ${statsData.genderRatio.L} | P: ${statsData.genderRatio.P}`,
+      icon: <WcIcon sx={{ fontSize: 32, color: "white" }} />,
       gradient: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-      trend: "Optimal",
+      trend: "Demografi",
+      trendColor: "#059669",
+      trendBg: "rgba(16, 185, 129, 0.1)",
     },
   ];
 
@@ -89,9 +183,7 @@ export default function DashboardPage() {
                 >
                   {stat.icon}
                 </Box>
-                <IconButton size="small">
-                  <MoreVertIcon />
-                </IconButton>
+                {/* Visual loading indicator for individual cards if needed, or just text */}
               </Box>
 
               <Typography
@@ -117,8 +209,8 @@ export default function DashboardPage() {
                   px: 1.5,
                   py: 0.5,
                   borderRadius: "20px",
-                  bgcolor: "rgba(16, 185, 129, 0.1)",
-                  color: "#059669",
+                  bgcolor: stat.trendBg,
+                  color: stat.trendColor,
                   fontSize: "0.875rem",
                   fontWeight: 600,
                 }}

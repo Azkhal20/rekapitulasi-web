@@ -1,75 +1,132 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, Typography, CircularProgress, Alert } from "@mui/material";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Paper,
+} from "@mui/material";
 import PatientDataTable from "@/components/PatientDataTable";
-import { fetchPatientData } from "@/lib/googleSheets";
-import { Patient } from "@/types/patient";
+import { patientService } from "@/services/patientService"; // Use Service instead of lib
+import { PatientData } from "@/services/patientService";
+
+// Custom Order as requested: Starting from NOVEMBER
+const MONTHS = [
+  "NOVEMBER",
+  "DESEMBER",
+  "JANUARI",
+  "FEBRUARI",
+  "MARET",
+  "APRIL",
+  "MEI",
+  "JUNI",
+  "JULI",
+  "AGUSTUS",
+  "SEPTEMBER",
+  "OKTOBER",
+];
 
 export default function PatientsPage() {
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER"); // Default start
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchPatientData();
+      // Fetch using the monthly-aware service
+      const data = await patientService.getAllPatients(selectedMonth);
       setPatients(data);
     } catch (err) {
       console.error("Error loading patient data:", err);
       setError(
         err instanceof Error
           ? err.message
-          : "Gagal memuat data pasien. Pastikan Google Sheets dapat diakses dan API key valid."
+          : "Gagal memuat data pasien. Pastikan Google Sheets dapat diakses dan Apps Script sudah dideploy ulang."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  // Reload when month changes
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedMonth]);
 
   const handleDataChange = () => {
-    // Reload data after CRUD operations
     loadData();
   };
 
-  if (loading) {
-    return (
+  return (
+    <Box>
       <Box
+        mb={3}
         display="flex"
-        flexDirection="column"
-        justifyContent="center"
+        justifyContent="space-between"
         alignItems="center"
-        minHeight="60vh"
+        flexWrap="wrap"
+        gap={2}
       >
-        <CircularProgress
-          size={40}
-          thickness={4}
-          sx={{ color: "#4F46E5", mb: 2 }}
-        />
-        <Typography variant="body2" color="text.secondary">
-          Memuat data pasien...
-        </Typography>
-      </Box>
-    );
-  }
+        <Box>
+          <Typography
+            variant="h4"
+            gutterBottom
+            fontWeight="bold"
+            sx={{ color: "#111827" }}
+          >
+            Data Pasien - Bulan {selectedMonth}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Total: {patients.length} pasien terdaftar pada bulan ini
+          </Typography>
+        </Box>
 
-  if (error) {
-    return (
-      <Box>
-        <Typography
-          variant="h5"
-          gutterBottom
-          fontWeight="bold"
-          sx={{ color: "#111827" }}
+        {/* Month Selector */}
+        <Paper sx={{ p: 1, borderRadius: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Pilih Bulan</InputLabel>
+            <Select
+              value={selectedMonth}
+              label="Pilih Bulan"
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              {MONTHS.map((month) => (
+                <MenuItem key={month} value={month}>
+                  {month}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+      </Box>
+
+      {loading ? (
+        <Box
+          display="flex"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="50vh"
         >
-          Data Pasien
-        </Typography>
+          <CircularProgress
+            size={40}
+            thickness={4}
+            sx={{ color: "#4F46E5", mb: 2 }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            Memuat data bulan {selectedMonth}...
+          </Typography>
+        </Box>
+      ) : error ? (
         <Alert
           severity="error"
           sx={{
@@ -79,40 +136,24 @@ export default function PatientsPage() {
           }}
         >
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-            Gagal Memuat Data
+            Gagal Memuat Data ({selectedMonth})
           </Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
             {error}
           </Typography>
-          <Typography
-            variant="caption"
-            sx={{ display: "block", mt: 1, opacity: 0.8 }}
-          >
-            Tips: Pastikan Google Sheet Anda diatur ke &quot;Anyone with the
-            link&quot; (Public) jika hanya menggunakan API Key.
+          <Typography variant="caption">
+            Tips: Pastikan Tab Sheet bernama <strong>{selectedMonth}</strong>{" "}
+            sudah dibuat di Google Sheet Anda dan memiliki Header kolom yang
+            sama.
           </Typography>
         </Alert>
-      </Box>
-    );
-  }
-
-  return (
-    <Box>
-      <Box mb={3}>
-        <Typography
-          variant="h4"
-          gutterBottom
-          fontWeight="bold"
-          sx={{ color: "#111827" }}
-        >
-          Data Pasien
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Total: {patients.length} pasien terdaftar
-        </Typography>
-      </Box>
-
-      <PatientDataTable data={patients} onDataChange={handleDataChange} />
+      ) : (
+        <PatientDataTable
+          data={patients} // Cast to Patient[] if needed, but interfaces match roughly
+          onDataChange={handleDataChange}
+          sheetName={selectedMonth} // Pass selected month to table
+        />
+      )}
     </Box>
   );
 }
