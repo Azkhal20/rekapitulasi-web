@@ -24,6 +24,7 @@ interface PatientFormDialogProps {
   onSubmit: (data: Omit<PatientData, "id">) => Promise<void>;
   initialData?: PatientData | null;
   mode: "add" | "edit";
+  defaultTahun?: string; // New Prop to override default year logic
 }
 
 // Helper: Convert "YYYY-MM-DD" to "DD MMM YYYY" (Indonesian)
@@ -95,6 +96,7 @@ export default function PatientFormDialog({
   onSubmit,
   initialData,
   mode,
+  defaultTahun,
 }: PatientFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,9 +138,12 @@ export default function PatientFormDialog({
         // Auto-fill date fields for new patient
         const now = new Date();
         const tanggal = now.toISOString().split("T")[0]; // YYYY-MM-DD
-        const tahun = now.getFullYear().toString();
-        const bulan = now.toLocaleDateString("id-ID", { month: "long" });
-        const hari = now.toLocaleDateString("id-ID", { weekday: "long" });
+
+        // AUTO NUMBERING LOGIC: Use defaultTahun prop if available, else fallback to current year
+        const tahun = defaultTahun || now.getFullYear().toString();
+
+        const bulan = ""; // Cleared
+        const hari = ""; // Cleared
 
         setFormData({
           TANGGAL: tanggal,
@@ -161,7 +166,7 @@ export default function PatientFormDialog({
       }
       setError(null);
     }
-  }, [open, initialData, mode]);
+  }, [open, initialData, mode, defaultTahun]);
 
   const handleChange = (
     field: keyof Omit<PatientData, "id">,
@@ -175,11 +180,15 @@ export default function PatientFormDialog({
         try {
           const date = new Date(value);
           if (!isNaN(date.getTime())) {
-            updates.TAHUN = date.getFullYear().toString();
-            updates.BULAN = date.toLocaleDateString("id-ID", { month: "long" });
-            updates.HARI = date.toLocaleDateString("id-ID", {
-              weekday: "long",
-            });
+            // Disabled auto-fill for HARI and BULAN on date change based on request?
+            // User requested default values be cleared.
+            // If user selects a date, should we fill them?
+            // "data hari dan bulan nya diapus defaultnya, karena isinya adalah angka bukan nama hari atau bulannya"
+            // This implies they want to enter it manually OR the auto-calc was wrong.
+            // Let's keep auto-calc OFF for now as per "diapus defaultnya".
+            // If they want auto-calc, they usually say "fix the auto calc".
+            // updates.BULAN = date.toLocaleDateString("id-ID", { month: "long" });
+            // updates.HARI = date.toLocaleDateString("id-ID", { weekday: "long" });
           }
         } catch (_) {
           // ignore invalid date during typing
@@ -289,22 +298,18 @@ export default function PatientFormDialog({
                 label="Hari"
                 value={formData.HARI}
                 onChange={(e) => handleChange("HARI", e.target.value)}
-                InputProps={{ readOnly: true }}
-                variant="filled"
               />
               <TextField
                 label="Bulan"
                 value={formData.BULAN}
                 onChange={(e) => handleChange("BULAN", e.target.value)}
-                InputProps={{ readOnly: true }}
-                variant="filled"
               />
               <TextField
                 label="Tahun"
+                placeholder="No. Urut"
                 value={formData.TAHUN}
                 onChange={(e) => handleChange("TAHUN", e.target.value)}
-                InputProps={{ readOnly: true }}
-                variant="filled"
+                helperText="Auto +1 dari data terakhir"
               />
             </Stack>
 

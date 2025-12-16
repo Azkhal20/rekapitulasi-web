@@ -67,13 +67,15 @@ const NON_SORTABLE_COLUMNS = [
 ];
 
 interface PatientDataTableProps {
-  data: Patient[];
+  data: Patient[] | PatientData[]; // Support both types
   onDataChange?: () => void;
+  sheetName: string; // REQUIRED: To know which monthly sheet to edit
 }
 
 export default function PatientDataTable({
   data,
   onDataChange,
+  sheetName,
 }: PatientDataTableProps) {
   // Existing table state
   const [page, setPage] = useState(0);
@@ -91,17 +93,51 @@ export default function PatientDataTable({
     null
   );
 
+  const [nextTahun, setNextTahun] = useState<string>("1");
+
   // Get column names from first data row
   const columns = useMemo(() => {
     if (data.length === 0) return [];
     return Object.keys(data[0]).filter((key) => key !== "id");
   }, [data]);
 
+  // Fallback columns if data is empty (to show headers)
+  const effectiveColumns = useMemo(() => {
+    if (columns.length > 0) return columns;
+    // Default headers order matching the Form/Sheet typically
+    return [
+      "TANGGAL",
+      "HARI",
+      "BULAN",
+      "TAHUN",
+      "16-15",
+      "L",
+      "P",
+      "NAMA",
+      "USIA",
+      "NIP",
+      "OBS TTV",
+      "KELUHAN",
+      "DIAGNOSIS",
+      "ICD-10",
+      "TINDAKAN",
+      "OBAT",
+    ];
+  }, [columns]);
+
   // Helper to format date
+  // FIX INVALID DATE ISSUE
   const formatDate = (dateString: string) => {
     try {
       if (!dateString) return "-";
+      // If it already looks like "16 Des 2025" (contains letters), just return it
+      // Simple regex to check for alphabetical characters
+      if (/[a-zA-Z]/.test(dateString)) return dateString;
+
       const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) return dateString; // Return original if parsing fails
+
       // Format: 15 Nov 2025
       return date.toLocaleDateString("id-ID", {
         day: "numeric",
@@ -200,12 +236,32 @@ export default function PatientDataTable({
 
   // CRUD Handlers
   const handleAddPatient = () => {
+    // LOGIC: Get Last Row's TAHUN + 1
+    let nextNum = "1";
+    if (data.length > 0) {
+      // Sort by ID descending to get the latest entry added
+      const sorted = [...data].sort(
+        (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0)
+      );
+      const lastEntry = sorted[0];
+
+      if (lastEntry && lastEntry.TAHUN) {
+        // Try parsing previous TAHUN value
+        const lastVal = parseInt(lastEntry.TAHUN);
+        if (!isNaN(lastVal)) {
+          nextNum = (lastVal + 1).toString();
+        }
+      }
+    }
+    setNextTahun(nextNum);
+
     setFormMode("add");
     setSelectedPatient(null);
     setFormDialogOpen(true);
   };
 
   const handleEditPatient = (patient: any) => {
+    setNextTahun("");
     setFormMode("edit");
 
     // MAPPING FIX: Sesuaikan dengan Key dari Google Sheet JSON
@@ -226,9 +282,12 @@ export default function PatientDataTable({
       OBS_TTV: String(patient["OBS TTV"] || patient.OBS_TTV || ""),
       KELUHAN: String(patient.KELUHAN || ""),
       DIAGNOSIS: String(patient.DIAGNOSIS || ""),
-      ICD10: String(patient["ICD-10"] || patient.ICD10 || ""),
+      // Robust key mapping for ICD-10 and TINDAKAN
+      ICD10: String(
+        patient["ICD-10"] || patient["ICD 10"] || patient.ICD10 || ""
+      ),
       TINDAKAN: String(
-        patient["TINDAKAN "] || patient["TINDAKAN"] || patient.TINDAKAN || ""
+        patient["TINDAKAN"] || patient["TINDAKAN "] || patient.TINDAKAN || ""
       ),
       OBAT: String(patient.OBAT || ""),
     };
@@ -259,7 +318,8 @@ export default function PatientDataTable({
             },
           });
 
-          await patientService.deletePatient(patient.id as number);
+          // PASS SHEET NAME TO SERVICE
+          await patientService.deletePatient(patient.id as number, sheetName);
 
           Swal.close();
 
@@ -297,8 +357,34 @@ export default function PatientDataTable({
         },
       });
 
+      // MAPPING FIX FOR WRITE OPERATIONS
+      // Google Sheets backend V5 expects Header names as keys (e.g., "OBS TTV", not "OBS_TTV")
+      const payload: any = { ...formData };
+
+      // Remap internal keys to Google Sheet keys
+      if (payload.OBS_TTV) {
+        payload["OBS TTV"] = payload.OBS_TTV;
+        delete payload.OBS_TTV;
+      }
+      if (payload.ICD10) {
+        payload["ICD-10"] = payload.ICD10;
+        delete payload.ICD10;
+      }
+      if (payload.ENAM_BELAS_LIMA_BELAS) {
+        payload["16-15"] = payload.ENAM_BELAS_LIMA_BELAS;
+        delete payload.ENAM_BELAS_LIMA_BELAS;
+      }
+
+      // Let's force-add these keys to payload just in case
+      payload["OBS TTV"] = formData.OBS_TTV || "";
+      payload["ICD-10"] = formData.ICD10 || "";
+      payload["16-15"] = formData.ENAM_BELAS_LIMA_BELAS || "";
+      payload["TINDAKAN"] = formData.TINDAKAN || "";
+      payload["TINDAKAN "] = formData.TINDAKAN || "";
+
       if (formMode === "add") {
-        await patientService.addPatient(formData);
+        // PASS SHEET NAME TO SERVICE
+        await patientService.addPatient(payload, sheetName);
 
         Swal.close();
         setTimeout(() => {
@@ -309,7 +395,12 @@ export default function PatientDataTable({
         }, 300);
       } else {
         if (selectedPatient?.id) {
-          await patientService.updatePatient(selectedPatient.id, formData);
+          // PASS SHEET NAME TO SERVICE
+          await patientService.updatePatient(
+            selectedPatient.id,
+            payload,
+            sheetName
+          );
 
           Swal.close();
           setTimeout(() => {
@@ -341,13 +432,7 @@ export default function PatientDataTable({
     }
   };
 
-  if (columns.length === 0) {
-    return (
-      <Paper sx={{ p: 3, textAlign: "center" }}>
-        <Box>Tidak ada data untuk ditampilkan</Box>
-      </Paper>
-    );
-  }
+  // REMOVED EARLY RETURN TO ALWAYS SHOW CONTROLS AND ADD BUTTON
 
   return (
     <Box>
@@ -437,7 +522,7 @@ export default function PatientDataTable({
               <MenuItem value="">
                 <strong>Tidak ada</strong>
               </MenuItem>
-              {columns.map((col) => (
+              {effectiveColumns.map((col) => (
                 <MenuItem key={col} value={col}>
                   {col}
                 </MenuItem>
@@ -543,7 +628,7 @@ export default function PatientDataTable({
                 >
                   NO
                 </TableCell>
-                {columns.map((column) => {
+                {effectiveColumns.map((column) => {
                   // Check if sorting feature should be disabled for this column
                   const isSortable = !NON_SORTABLE_COLUMNS.includes(column);
 
@@ -607,7 +692,7 @@ export default function PatientDataTable({
               {paginatedData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length + 2}
+                    colSpan={effectiveColumns.length + 2}
                     align="center"
                     sx={{ py: 4 }}
                   >
@@ -617,7 +702,7 @@ export default function PatientDataTable({
                       alignItems="center"
                     >
                       <Typography color="text.secondary">
-                        Tidak ada data yang sesuai
+                        Data belum Tersedia untuk Bulan {sheetName}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -632,7 +717,7 @@ export default function PatientDataTable({
                     <TableCell sx={{ color: "black" }}>
                       {page * rowsPerPage + index + 1}
                     </TableCell>
-                    {columns.map((column) => {
+                    {effectiveColumns.map((column) => {
                       // Handle formatting
                       let cellValue = (row as any)[column] || "-";
 
@@ -729,6 +814,7 @@ export default function PatientDataTable({
         onSubmit={handleFormSubmit}
         initialData={selectedPatient}
         mode={formMode}
+        defaultTahun={nextTahun}
       />
     </Box>
   );
