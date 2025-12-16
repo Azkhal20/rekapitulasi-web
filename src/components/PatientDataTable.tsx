@@ -72,6 +72,15 @@ interface PatientDataTableProps {
   sheetName: string; // REQUIRED: To know which monthly sheet to edit
 }
 
+// Type Guard or Helper to access properties safely
+function getRowValue(
+  row: Patient | PatientData,
+  column: string
+): string | number {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (row as any)[column];
+}
+
 export default function PatientDataTable({
   data,
   onDataChange,
@@ -152,7 +161,7 @@ export default function PatientDataTable({
   // Get unique values for a column (for filter dropdown)
   const getUniqueValues = (column: string) => {
     const values = data
-      .map((row) => String((row as any)[column] || ""))
+      .map((row) => String(getRowValue(row, column) || ""))
       .filter(Boolean);
     return Array.from(new Set(values)).sort();
   };
@@ -174,15 +183,15 @@ export default function PatientDataTable({
     // Apply column filter
     if (filterColumn && filterValue) {
       result = result.filter(
-        (row) => String((row as any)[filterColumn]) === filterValue
+        (row) => String(getRowValue(row, filterColumn)) === filterValue
       );
     }
 
     // Apply sorting
     if (sortColumn) {
       result.sort((a, b) => {
-        const aValue = String((a as any)[sortColumn] || "");
-        const bValue = String((b as any)[sortColumn] || "");
+        const aValue = String(getRowValue(a, sortColumn) || "");
+        const bValue = String(getRowValue(b, sortColumn) || "");
 
         if (sortDirection === "asc") {
           return aValue.localeCompare(bValue);
@@ -240,14 +249,24 @@ export default function PatientDataTable({
     let nextNum = "1";
     if (data.length > 0) {
       // Sort by ID descending to get the latest entry added
-      const sorted = [...data].sort(
-        (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0)
-      );
+      // Fix: Type safe access to id
+      const sorted = [...data].sort((a, b) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const idA = Number((a as any).id) || 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const idB = Number((b as any).id) || 0;
+        return idB - idA;
+      });
       const lastEntry = sorted[0];
 
-      if (lastEntry && lastEntry.TAHUN) {
+      // Fix: Safe access to TAHUN
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lastTahun = (lastEntry as any).TAHUN;
+
+      if (lastEntry && lastTahun) {
         // Try parsing previous TAHUN value
-        const lastVal = parseInt(lastEntry.TAHUN);
+        // FIX: parseInt expects string, so we convert explicitly
+        const lastVal = parseInt(String(lastTahun));
         if (!isNaN(lastVal)) {
           nextNum = (lastVal + 1).toString();
         }
@@ -260,46 +279,49 @@ export default function PatientDataTable({
     setFormDialogOpen(true);
   };
 
-  const handleEditPatient = (patient: any) => {
+  const handleEditPatient = (patient: Patient | PatientData) => {
     setNextTahun("");
     setFormMode("edit");
 
+    // Helper access
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = patient as any;
+
     // MAPPING FIX: Sesuaikan dengan Key dari Google Sheet JSON
     const patientData: PatientData = {
-      id: patient.id as number,
-      TANGGAL: String(patient.TANGGAL || ""),
-      TAHUN: String(patient.TAHUN || ""),
-      BULAN: String(patient.BULAN || ""),
-      HARI: String(patient.HARI || ""),
+      id: p.id as number,
+      TANGGAL: String(p.TANGGAL || ""),
+      TAHUN: String(p.TAHUN || ""),
+      BULAN: String(p.BULAN || ""),
+      HARI: String(p.HARI || ""),
       ENAM_BELAS_LIMA_BELAS: String(
-        patient["16-15"] || patient.ENAM_BELAS_LIMA_BELAS || ""
+        p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || ""
       ),
-      L: String(patient.L || ""),
-      P: String(patient.P || ""),
-      NAMA: String(patient.NAMA || ""),
-      USIA: String(patient.USIA || ""),
-      NIP: String(patient.NIP || ""),
-      OBS_TTV: String(patient["OBS TTV"] || patient.OBS_TTV || ""),
-      KELUHAN: String(patient.KELUHAN || ""),
-      DIAGNOSIS: String(patient.DIAGNOSIS || ""),
+      L: String(p.L || ""),
+      P: String(p.P || ""),
+      NAMA: String(p.NAMA || ""),
+      USIA: String(p.USIA || ""),
+      NIP: String(p.NIP || ""),
+      OBS_TTV: String(p["OBS TTV"] || p.OBS_TTV || ""),
+      KELUHAN: String(p.KELUHAN || ""),
+      DIAGNOSIS: String(p.DIAGNOSIS || ""),
       // Robust key mapping for ICD-10 and TINDAKAN
-      ICD10: String(
-        patient["ICD-10"] || patient["ICD 10"] || patient.ICD10 || ""
-      ),
-      TINDAKAN: String(
-        patient["TINDAKAN"] || patient["TINDAKAN "] || patient.TINDAKAN || ""
-      ),
-      OBAT: String(patient.OBAT || ""),
+      ICD10: String(p["ICD-10"] || p["ICD 10"] || p.ICD10 || ""),
+      TINDAKAN: String(p["TINDAKAN"] || p["TINDAKAN "] || p.TINDAKAN || ""),
+      OBAT: String(p.OBAT || ""),
     };
 
     setSelectedPatient(patientData);
     setFormDialogOpen(true);
   };
 
-  const handleDeleteClick = (patient: any) => {
+  const handleDeleteClick = (patient: Patient | PatientData) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = patient as any;
+
     MySwal.fire({
       title: "Apakah Anda yakin?",
-      text: `Anda akan menghapus data pasien ${patient.NAMA}. Data tidak dapat dikembalikan!`,
+      text: `Anda akan menghapus data pasien ${p.NAMA}. Data tidak dapat dikembalikan!`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#FF4C51",
@@ -319,7 +341,7 @@ export default function PatientDataTable({
           });
 
           // PASS SHEET NAME TO SERVICE
-          await patientService.deletePatient(patient.id as number, sheetName);
+          await patientService.deletePatient(p.id as number, sheetName);
 
           Swal.close();
 
@@ -359,6 +381,7 @@ export default function PatientDataTable({
 
       // MAPPING FIX FOR WRITE OPERATIONS
       // Google Sheets backend V5 expects Header names as keys (e.g., "OBS TTV", not "OBS_TTV")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload: any = { ...formData };
 
       // Remap internal keys to Google Sheet keys
@@ -431,8 +454,6 @@ export default function PatientDataTable({
       throw error;
     }
   };
-
-  // REMOVED EARLY RETURN TO ALWAYS SHOW CONTROLS AND ADD BUTTON
 
   return (
     <Box>
@@ -702,7 +723,7 @@ export default function PatientDataTable({
                       alignItems="center"
                     >
                       <Typography color="text.secondary">
-                        Data belum Tersedia untuk Bulan {sheetName}
+                        Tidak ada data yang sesuai
                       </Typography>
                     </Box>
                   </TableCell>
@@ -710,7 +731,7 @@ export default function PatientDataTable({
               ) : (
                 paginatedData.map((row, index) => (
                   <TableRow
-                    key={row.id || index}
+                    key={String(getRowValue(row, "id")) || index}
                     hover
                     sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                   >
@@ -719,11 +740,11 @@ export default function PatientDataTable({
                     </TableCell>
                     {effectiveColumns.map((column) => {
                       // Handle formatting
-                      let cellValue = (row as any)[column] || "-";
+                      let cellValue = getRowValue(row, column) || "-";
 
                       // Format Date for 'TANGGAL' column
                       if (column === "TANGGAL" && cellValue !== "-") {
-                        cellValue = formatDate(cellValue);
+                        cellValue = formatDate(String(cellValue));
                       }
 
                       return (
