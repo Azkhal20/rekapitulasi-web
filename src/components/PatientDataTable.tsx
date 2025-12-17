@@ -33,7 +33,11 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
-import { patientService, PatientData } from "@/services/patientService";
+import {
+  patientService,
+  PatientData,
+  PoliType,
+} from "@/services/patientService";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 
@@ -70,6 +74,7 @@ interface PatientDataTableProps {
   data: Patient[] | PatientData[]; // Support both types
   onDataChange?: () => void;
   sheetName: string; // REQUIRED: To know which monthly sheet to edit
+  poliType: PoliType; // NEW: To know which clinic API to call
 }
 
 // Type Guard or Helper to access properties safely
@@ -85,6 +90,7 @@ export default function PatientDataTable({
   data,
   onDataChange,
   sheetName,
+  poliType,
 }: PatientDataTableProps) {
   // Existing table state
   const [page, setPage] = useState(0);
@@ -341,7 +347,11 @@ export default function PatientDataTable({
           });
 
           // PASS SHEET NAME TO SERVICE
-          await patientService.deletePatient(p.id as number, sheetName);
+          await patientService.deletePatient(
+            p.id as number,
+            sheetName,
+            poliType
+          );
 
           Swal.close();
 
@@ -407,7 +417,7 @@ export default function PatientDataTable({
 
       if (formMode === "add") {
         // PASS SHEET NAME TO SERVICE
-        await patientService.addPatient(payload, sheetName);
+        await patientService.addPatient(payload, sheetName, poliType);
 
         Swal.close();
         setTimeout(() => {

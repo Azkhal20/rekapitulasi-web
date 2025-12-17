@@ -1,6 +1,3 @@
-// Google Apps Script Web App URL
-const GOOGLE_SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL || '';
-
 export interface PatientData {
   id?: number;
   TANGGAL: string;
@@ -21,15 +18,20 @@ export interface PatientData {
   OBAT: string;
 }
 
-class PatientService {
-  private baseUrl: string;
+export type PoliType = 'umum' | 'gigi';
 
-  constructor() {
-    this.baseUrl = GOOGLE_SCRIPT_URL;
+class PatientService {
+  
+  private getBaseUrl(poli: PoliType = 'umum'): string {
+    const url = poli === 'gigi' 
+      ? process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_GIGI 
+      : process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_UMUM; // Fallback / Default
+      
+    return url || '';
   }
 
-  private checkUrl() {
-    if (!this.baseUrl || this.baseUrl.includes('YOUR_DEPLOYMENT_ID')) {
+  private checkUrl(baseUrl: string) {
+    if (!baseUrl || baseUrl.includes('YOUR_DEPLOYMENT_ID')) {
       throw new Error('URL Apps Script belum dikonfigurasi di .env.local');
     }
   }
@@ -54,35 +56,36 @@ class PatientService {
     }
   }
 
-  // GET ALL with SheetName Param
-  async getAllPatients(sheetName: string = "JANUARI"): Promise<PatientData[]> {
+  // GET ALL
+  async getAllPatients(sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData[]> {
     try {
-      this.checkUrl();
-      // Append sheetName to URL
-      const url = `${this.baseUrl}?action=getAll&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
+      
+      const url = `${baseUrl}?action=getAll&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
       
       const response = await fetch(url, {
         method: 'GET',
-        // headers removed to avoid preflight CORS options request
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await this.parseResponse(response, 'getAll');
     } catch (error) {
-      console.error(`Error fetching patients (Sheet: ${sheetName}):`, error);
+      console.error(`Error fetching patients (Sheet: ${sheetName}, Poli: ${poli}):`, error);
       throw error;
     }
   }
 
   // GET BY ID
-  async getPatientById(id: number, sheetName: string = "JANUARI"): Promise<PatientData> {
+  async getPatientById(id: number, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData> {
     try {
-      this.checkUrl();
-      const url = `${this.baseUrl}?action=getById&id=${id}&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
+      
+      const url = `${baseUrl}?action=getById&id=${id}&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
       
       const response = await fetch(url, {
         method: 'GET',
-        // headers removed to avoid preflight CORS options request
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -93,22 +96,22 @@ class PatientService {
     }
   }
 
-  // ADD (Pass sheetName in Body)
-  async addPatient(patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI"): Promise<{ message: string }> {
+  // ADD
+  async addPatient(patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
-      this.checkUrl();
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
-      // Inject sheetName into body
       const payload = { ...patientData, sheetName };
 
-      const response = await fetch(`${this.baseUrl}?action=add`, {
+      const response = await fetch(`${baseUrl}?action=add`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain to avoid preflight
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
@@ -122,13 +125,13 @@ class PatientService {
     }
   }
 
-  // UPDATE (Pass sheetName in Body, NO +1 HOTFIX)
-  async updatePatient(id: number, patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI"): Promise<{ message: string }> {
+  // UPDATE
+  async updatePatient(id: number, patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
-      this.checkUrl();
-      // REMOVED HOTFIX +1
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
       
-      console.log('🔵 UPDATE Request');
+      console.log(`🔵 UPDATE Request [${poli}]`);
       console.log('Sheet:', sheetName);
       console.log('ID:', id);
       
@@ -137,7 +140,7 @@ class PatientService {
       
       const payload = { id: id, ...patientData, sheetName };
 
-      const response = await fetch(`${this.baseUrl}?action=update`, {
+      const response = await fetch(`${baseUrl}?action=update`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
@@ -155,19 +158,19 @@ class PatientService {
     }
   }
 
-  // DELETE (Pass sheetName in Body, NO +1 HOTFIX)
-  async deletePatient(id: number, sheetName: string = "JANUARI"): Promise<{ message: string }> {
+  // DELETE
+  async deletePatient(id: number, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
-      this.checkUrl();
-      // REMOVED HOTFIX +1
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
 
-      console.log('🔴 DELETE Request');
+      console.log(`🔴 DELETE Request [${poli}]`);
       console.log('Sheet:', sheetName);
       console.log('ID:', id);
       
       const payload = { id: id, sheetName };
 
-      const response = await fetch(`${this.baseUrl}?action=delete`, {
+      const response = await fetch(`${baseUrl}?action=delete`, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
