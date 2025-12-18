@@ -42,8 +42,8 @@ export default function PatientsPage() {
     try {
       setLoading(true);
       setError(null);
-      // Fetch using the monthly-aware service
-      const data = await patientService.getAllPatients(selectedMonth);
+      // Fetch using the monthly-aware service (Default to 'umum' for legacy page)
+      const data = await patientService.getAllPatients(selectedMonth, "umum");
       setPatients(data);
     } catch (err) {
       console.error("Error loading patient data:", err);
@@ -152,6 +152,7 @@ export default function PatientsPage() {
           data={patients} // Cast to Patient[] if needed, but interfaces match roughly
           onDataChange={handleDataChange}
           sheetName={selectedMonth} // Pass selected month to table
+          poliType="umum" // Explicitly pass 'umum' to fix build error
         />
       )}
     </Box>
