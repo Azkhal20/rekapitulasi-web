@@ -17,7 +17,8 @@ import {
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import LogoutIcon from "@mui/icons-material/Logout";
-import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+import MedicalServicesIcon from "@mui/icons-material/MedicalServices"; // Import added
 import { Box } from "@mui/material";
 
 const openedMixin = (theme: Theme, drawerWidth: number): CSSObject => ({
@@ -76,12 +77,17 @@ const menuItems = [
         href: "/dashboard",
       },
       {
-        text: "Data Pasien",
+        text: "Poli Umum",
         icon: <PeopleIcon />,
-        href: "/dashboard/patients",
+        href: "/dashboard/poli/umum",
       },
-    ]
-  }
+      {
+        text: "Poli Gigi",
+        icon: <MedicalServicesIcon />,
+        href: "/dashboard/poli/gigi",
+      },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -95,44 +101,69 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
   return (
     <StyledDrawer variant="permanent" open={open} drawerWidth={drawerWidth}>
       <DrawerHeader>
-        <LocalHospitalIcon sx={{ color: '#696CFF', fontSize: 36, mr: 1.5, flexShrink: 0 }} />
+        <LocalHospitalIcon
+          sx={{ color: "#696CFF", fontSize: 36, mr: 1.5, flexShrink: 0 }}
+        />
         {open && (
-           <Box sx={{ overflow: 'hidden' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.1, color: '#566a7f', fontSize: '1.25rem', fontFamily: 'inherit' }}>
-              REKAP <span style={{ color: '#696CFF' }}>APP</span>
+          <Box sx={{ overflow: "hidden" }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 800,
+                lineHeight: 1.1,
+                color: "#566a7f",
+                fontSize: "1.25rem",
+                fontFamily: "inherit",
+              }}
+            >
+              REKAP <span style={{ color: "#696CFF" }}>APP</span>
             </Typography>
-            <Typography variant="caption" sx={{ color: '#a1acb8', display: 'block', fontSize: '0.65rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "#a1acb8",
+                display: "block",
+                fontSize: "0.65rem",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+            >
               REKAPITULASI PASIEN
             </Typography>
-           </Box>
+          </Box>
         )}
       </DrawerHeader>
-      
+
       <List sx={{ px: 1.5 }}>
         {menuItems.map((section, idx) => (
           <Box key={idx}>
             {open && (
-               <Typography 
-                 variant="caption" 
-                 sx={{ 
-                   px: 2, 
-                   mt: 2, 
-                   mb: 1, 
-                   display: 'block', 
-                   fontWeight: 700, 
-                   color: '#a1acb8',
-                   opacity: 0.8,
-                   fontSize: '0.75rem',
-                   letterSpacing: '0.5px'
-                 }}
-               >
-                 {section.header}
-               </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 2,
+                  mt: 2,
+                  mb: 1,
+                  display: "block",
+                  fontWeight: 700,
+                  color: "#a1acb8",
+                  opacity: 0.8,
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {section.header}
+              </Typography>
             )}
             {section.items.map((item) => {
               const isActive = pathname === item.href;
               return (
-                <ListItem key={item.text} disablePadding sx={{ display: "block", mb: 0.5 }}>
+                <ListItem
+                  key={item.text}
+                  disablePadding
+                  sx={{ display: "block", mb: 0.5 }}
+                >
                   <ListItemButton
                     component={Link}
                     href={item.href}
@@ -142,12 +173,14 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                       justifyContent: open ? "initial" : "center",
                       px: 2.5,
                       borderRadius: 2, // Rounded corners like Sneat
-                      color: isActive ? 'primary.main' : 'text.primary',
-                      backgroundColor: isActive ? 'rgba(105, 108, 255, 0.16) !important' : 'transparent',
-                      transition: 'all 0.2s ease-in-out',
+                      color: isActive ? "primary.main" : "text.primary",
+                      backgroundColor: isActive
+                        ? "rgba(105, 108, 255, 0.16) !important"
+                        : "transparent",
+                      transition: "all 0.2s ease-in-out",
                       "&:hover": {
-                        backgroundColor: 'rgba(69, 75, 87, 0.04)',
-                        color: isActive ? 'primary.main' : '#435971',
+                        backgroundColor: "rgba(69, 75, 87, 0.04)",
+                        color: isActive ? "primary.main" : "#435971",
                       },
                     }}
                   >
@@ -156,16 +189,16 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                         minWidth: 0,
                         mr: open ? 2 : "auto",
                         justifyContent: "center",
-                        color: isActive ? 'inherit' : '#566a7f',
+                        color: isActive ? "inherit" : "#566a7f",
                       }}
                     >
                       {item.icon}
                     </ListItemIcon>
                     <ListItemText
                       primary={item.text}
-                      primaryTypographyProps={{ 
-                        fontSize: '0.9375rem', 
-                        fontWeight: isActive ? 600 : 400 
+                      primaryTypographyProps={{
+                        fontSize: "0.9375rem",
+                        fontWeight: isActive ? 600 : 400,
                       }}
                       sx={{ opacity: open ? 1 : 0 }}
                     />
@@ -205,13 +238,13 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
             >
               <LogoutIcon />
             </ListItemIcon>
-            <ListItemText 
-              primary="Logout" 
+            <ListItemText
+              primary="Logout"
               sx={{ opacity: open ? 1 : 0 }}
-              primaryTypographyProps={{ 
-                 fontSize: '0.9375rem', 
-                 fontWeight: 500 
-              }} 
+              primaryTypographyProps={{
+                fontSize: "0.9375rem",
+                fontWeight: 500,
+              }}
             />
           </ListItemButton>
         </ListItem>
