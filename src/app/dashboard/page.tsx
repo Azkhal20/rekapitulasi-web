@@ -7,48 +7,71 @@ import {
   CardContent,
   Typography,
   Paper,
-  IconButton,
-  CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import WcIcon from "@mui/icons-material/Wc"; // Icon Gender
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+import WcIcon from "@mui/icons-material/Wc";
+import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Link from "next/link";
-import { patientService, PatientData } from "@/services/patientService";
+import TopDiagnosisChart from "@/components/Dashboard/TopDiagnosisChart";
+import { patientService, PoliType } from "@/services/patientService";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [selectedPoli, setSelectedPoli] = useState<PoliType>("umum");
   const [statsData, setStatsData] = useState({
     totalPatients: 0,
     todayPatients: 0,
-    genderRatio: { L: 0, P: 0 },
+    todayGender: { L: 0, P: 0 },
   });
+
+  // Helper: Check if cell is filled (truthy, not empty string, not dash)
+  const isFilled = (val: any) => {
+    if (!val) return false;
+    const s = val.toString().trim();
+    return s !== "" && s !== "-" && s !== "0";
+  };
+
+  // Helper: Get Current Month Name (Indonesia)
+  const getCurrentMonthName = () => {
+    const date = new Date();
+    const month = date.toLocaleDateString("id-ID", { month: "long" });
+    return month.toUpperCase();
+  };
+
+  const currentMonthName = getCurrentMonthName();
+
+  const handlePoliChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newPoli: PoliType | null
+  ) => {
+    if (newPoli !== null) {
+      setSelectedPoli(newPoli);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        // Default fetching from NOVEMBER as per user preference
-        const data = await patientService.getAllPatients("NOVEMBER");
+        const data = await patientService.getAllPatients(
+          currentMonthName,
+          selectedPoli
+        );
 
         // Calculate Stats
         const total = data.length;
 
         // Today's Patients
         const today = new Date();
-        // Reset time to verify date strictly
         const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
 
-        // Helper to normalize sheet date "16 Des 2025" to "2025-12-16"
         const parseDate = (d: string) => {
-          // If already YYYY-MM-DD
           if (d.includes("-") && d.length === 10) return d;
-
-          // If Indonesian format "16 Des 2025" or similar
           try {
-            // Basic check - if we can construct a date object
             const dateObj = new Date(d);
             if (!isNaN(dateObj.getTime())) {
               return dateObj.toISOString().split("T")[0];
@@ -59,76 +82,78 @@ export default function DashboardPage() {
           return "";
         };
 
-        const todayCount = data.filter((p) => {
+        const todayData = data.filter((p) => {
           if (!p.TANGGAL) return false;
-          // Check if backend returns ISO or formatted.
-          // It typically returns "16 Des 2025" if display value used, or "2025-12-16" if raw.
-          // Let's maximize match chance.
           const pDate = parseDate(p.TANGGAL);
           return pDate === todayStr;
-        }).length;
+        });
 
-        // Gender Ratio
+        const todayCount = todayData.length;
+
+        // Calculate Today's Gender
         let countL = 0;
         let countP = 0;
-        data.forEach((p) => {
-          const l = (p.L || "").toString().trim();
-          const valP = (p.P || "").toString().trim();
-
-          // Check if column L has "1" or "v" or anything truthy
-          if (l === "1" || l.toLowerCase() === "v" || l.toLowerCase() === "l")
-            countL++;
-          // Check if column P has "1" or "v"
-          if (
-            valP === "1" ||
-            valP.toLowerCase() === "v" ||
-            valP.toLowerCase() === "p"
-          )
-            countP++;
+        todayData.forEach((p) => {
+          if (isFilled(p.L)) countL++;
+          if (isFilled(p.P)) countP++;
         });
 
         setStatsData({
           totalPatients: total,
           todayPatients: todayCount,
-          genderRatio: { L: countL, P: countP },
+          todayGender: { L: countL, P: countP },
         });
       } catch (error) {
-        console.error("Failed to fetch dashboard stats", error);
+        console.error(
+          `Failed to fetch dashboard stats for ${selectedPoli}`,
+          error
+        );
+        setStatsData({
+          totalPatients: 0,
+          todayPatients: 0,
+          todayGender: { L: 0, P: 0 },
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchStats();
-  }, []);
+  }, [selectedPoli, currentMonthName]);
 
   const stats = [
     {
-      title: "Total Pasien (November)",
+      title: `Total Pasien (${selectedPoli === "gigi" ? "Gigi" : "Umum"})`,
       value: loading ? "..." : statsData.totalPatients.toLocaleString(),
       icon: <PeopleIcon sx={{ fontSize: 32, color: "white" }} />,
-      gradient: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-      trend: "Data Realtime",
-      trendColor: "#4F46E5",
-      trendBg: "rgba(79, 70, 229, 0.1)",
+      gradient:
+        selectedPoli === "gigi"
+          ? "linear-gradient(135deg, #EC4899 0%, #DB2777 100%)"
+          : "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
+      trend: `Bulan ${currentMonthName}`,
+      trendColor: selectedPoli === "gigi" ? "#DB2777" : "#4F46E5",
+      trendBg:
+        selectedPoli === "gigi"
+          ? "rgba(236, 72, 153, 0.1)"
+          : "rgba(79, 70, 229, 0.1)",
     },
     {
       title: "Kunjungan Hari Ini",
       value: loading ? "..." : statsData.todayPatients.toLocaleString(),
       icon: <AssignmentIcon sx={{ fontSize: 32, color: "white" }} />,
-      gradient: "linear-gradient(135deg, #EC4899 0%, #DB2777 100%)",
+      gradient: "linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)",
       trend: "Update Harian",
-      trendColor: "#DB2777",
-      trendBg: "rgba(236, 72, 153, 0.1)",
+      trendColor: "#0D9488",
+      trendBg: "rgba(20, 184, 166, 0.1)",
     },
     {
       title: "Laki-laki vs Perempuan",
       value: loading
         ? "..."
-        : `L: ${statsData.genderRatio.L} | P: ${statsData.genderRatio.P}`,
+        : `L: ${statsData.todayGender.L} | P: ${statsData.todayGender.P}`,
       icon: <WcIcon sx={{ fontSize: 32, color: "white" }} />,
       gradient: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
-      trend: "Demografi",
+      trend: "Hari Ini", // Changed to Daily
       trendColor: "#059669",
       trendBg: "rgba(16, 185, 129, 0.1)",
     },
@@ -136,20 +161,46 @@ export default function DashboardPage() {
 
   return (
     <Box>
-      <Box mb={4}>
-        <Typography
-          variant="h4"
-          fontWeight="bold"
-          sx={{ mb: 1, color: "#111827" }}
+      <Box
+        mb={4}
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        gap={2}
+      >
+        <Box>
+          <Typography
+            variant="h4"
+            fontWeight="bold"
+            sx={{ mb: 1, color: "#111827" }}
+          >
+            Dashboard Overview
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Pantau rekapitulasi data pasien secara real-time
+          </Typography>
+        </Box>
+
+        <ToggleButtonGroup
+          value={selectedPoli}
+          exclusive
+          onChange={handlePoliChange}
+          aria-label="Pilih Poli"
+          size="small"
         >
-          Dashboard Overview
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Pantau rekapitulasi data pasien secara real-time
-        </Typography>
+          <ToggleButton value="umum" aria-label="Poli Umum">
+            <PeopleIcon sx={{ mr: 1 }} fontSize="small" />
+            Poli Umum
+          </ToggleButton>
+          <ToggleButton value="gigi" aria-label="Poli Gigi">
+            <MedicalServicesIcon sx={{ mr: 1 }} fontSize="small" />
+            Poli Gigi
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - Back to 3 Columns */}
       <Box
         sx={{
           display: "grid",
@@ -183,7 +234,6 @@ export default function DashboardPage() {
                 >
                   {stat.icon}
                 </Box>
-                {/* Visual loading indicator for individual cards if needed, or just text */}
               </Box>
 
               <Typography
@@ -231,11 +281,17 @@ export default function DashboardPage() {
           mb={3}
         >
           <Box>
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
+            <Typography
+              variant="h5"
+              fontWeight="bold"
+              sx={{ color: "#374151" }}
+              gutterBottom
+            >
               Pusat Tindakan
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Akses cepat ke fitur-fitur penting
+              Akses cepat ke menu{" "}
+              {selectedPoli === "gigi" ? "Poli Gigi" : "Poli Umum"}
             </Typography>
           </Box>
         </Box>
@@ -249,7 +305,7 @@ export default function DashboardPage() {
         >
           <Box
             component={Link}
-            href="/dashboard/patients"
+            href={`/dashboard/poli/${selectedPoli}`}
             sx={{
               p: 3,
               borderRadius: "16px",
@@ -274,18 +330,22 @@ export default function DashboardPage() {
                   sx={{
                     p: 1.5,
                     borderRadius: "12px",
-                    bgcolor: "#E0E7FF",
-                    color: "#4F46E5",
+                    bgcolor: selectedPoli === "gigi" ? "#FCE7F3" : "#E0E7FF",
+                    color: selectedPoli === "gigi" ? "#DB2777" : "#4F46E5",
                   }}
                 >
-                  <PeopleIcon />
+                  {selectedPoli === "gigi" ? (
+                    <MedicalServicesIcon />
+                  ) : (
+                    <PeopleIcon />
+                  )}
                 </Box>
                 <Box>
                   <Typography variant="h6" color="text.primary">
-                    Data Pasien
+                    Data Pasien {selectedPoli === "gigi" ? "Gigi" : "Umum"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Lihat dan kelola data pasien
+                    Kelola data pasien poli {selectedPoli}
                   </Typography>
                 </Box>
               </Box>
@@ -305,11 +365,15 @@ export default function DashboardPage() {
             }}
           >
             <Typography variant="body1" color="text.secondary">
-              Fitur lainnya akan segera hadir
+              Fitur Poli {selectedPoli === "gigi" ? "Gigi" : "Umum"} lainnya
+              segera hadir
             </Typography>
           </Box>
         </Box>
       </Paper>
+
+      {/* Top Diagnosis Chart Section */}
+      <TopDiagnosisChart poliType={selectedPoli} />
     </Box>
   );
 }

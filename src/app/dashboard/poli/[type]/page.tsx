@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import {
   Box,
   Typography,
@@ -13,8 +14,11 @@ import {
   Paper,
 } from "@mui/material";
 import PatientDataTable from "@/components/PatientDataTable";
-import { patientService } from "@/services/patientService"; // Use Service instead of lib
-import { PatientData } from "@/services/patientService";
+import {
+  patientService,
+  PatientData,
+  PoliType,
+} from "@/services/patientService";
 
 // Custom Order as requested: Starting from NOVEMBER
 const MONTHS = [
@@ -32,39 +36,59 @@ const MONTHS = [
   "OKTOBER",
 ];
 
-export default function PatientsPage() {
+export default function PoliPage() {
+  const params = useParams();
+  const rawType = (params.type as string)?.toLowerCase();
+
+  // Validate and determine Poli Type
+  const isValidPoli = rawType === "umum" || rawType === "gigi";
+  const poliType: PoliType = rawType === "gigi" ? "gigi" : "umum";
+
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER"); // Default start
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // Fetch using the monthly-aware service (Default to 'umum' for legacy page)
-      const data = await patientService.getAllPatients(selectedMonth, "umum");
+      // Fetch using the monthly-aware service AND poliType
+      const data = await patientService.getAllPatients(selectedMonth, poliType);
       setPatients(data);
     } catch (err) {
       console.error("Error loading patient data:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal memuat data pasien. Pastikan Google Sheets dapat diakses dan Apps Script sudah dideploy ulang."
-      );
+      // More friendly error message
+      setError(err instanceof Error ? err.message : `Gagal memuat data.`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth, poliType]);
 
-  // Reload when month changes
+  // Reload when month or poli changes
   useEffect(() => {
-    loadData();
-  }, [selectedMonth]);
+    if (isValidPoli) {
+      loadData();
+    }
+  }, [loadData, isValidPoli]);
 
   const handleDataChange = () => {
     loadData();
   };
+
+  if (!isValidPoli) {
+    return (
+      <Box p={4} display="flex" justifyContent="center">
+        <Alert severity="error">
+          Tipe Poli tidak valid. Gunakan <strong>/dashboard/poli/umum</strong>{" "}
+          atau <strong>/dashboard/poli/gigi</strong>.
+        </Alert>
+      </Box>
+    );
+  }
+
+  const poliDisplayName = poliType === "gigi" ? "Poli Gigi" : "Poli Umum";
+  const poliColor = poliType === "gigi" ? "#EC4899" : "#4F46E5"; // Pink for Gigi, Blue for Umum
 
   return (
     <Box>
@@ -77,16 +101,32 @@ export default function PatientsPage() {
         gap={2}
       >
         <Box>
-          <Typography
-            variant="h4"
-            gutterBottom
-            fontWeight="bold"
-            sx={{ color: "#111827" }}
-          >
-            Data Pasien - Bulan {selectedMonth}
-          </Typography>
+          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+            <Typography
+              variant="h4"
+              fontWeight="bold"
+              sx={{ color: "#111827" }}
+            >
+              Data Pasien
+            </Typography>
+            <Box
+              sx={{
+                bgcolor: poliColor,
+                color: "white",
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                fontWeight: 700,
+                fontSize: "0.8em",
+              }}
+            >
+              {poliDisplayName}
+            </Box>
+          </Box>
+
           <Typography variant="body1" color="text.secondary">
-            Total: {patients.length} pasien terdaftar pada bulan ini
+            Bulan <strong>{selectedMonth}</strong> • Total: {patients.length}{" "}
+            pasien
           </Typography>
         </Box>
 
@@ -120,10 +160,10 @@ export default function PatientsPage() {
           <CircularProgress
             size={40}
             thickness={4}
-            sx={{ color: "#4F46E5", mb: 2 }}
+            sx={{ color: poliColor, mb: 2 }}
           />
           <Typography variant="body2" color="text.secondary">
-            Memuat data bulan {selectedMonth}...
+            Memuat data {poliDisplayName} ({selectedMonth})...
           </Typography>
         </Box>
       ) : error ? (
@@ -142,17 +182,17 @@ export default function PatientsPage() {
             {error}
           </Typography>
           <Typography variant="caption">
-            Tips: Pastikan Tab Sheet bernama <strong>{selectedMonth}</strong>{" "}
-            sudah dibuat di Google Sheet Anda dan memiliki Header kolom yang
-            sama.
+            Tips: Pastikan URL Apps Script untuk{" "}
+            <strong>{poliDisplayName}</strong> sudah disetup di .env.local dan
+            Tab Sheet bernama <strong>{selectedMonth}</strong> sudah ada.
           </Typography>
         </Alert>
       ) : (
         <PatientDataTable
-          data={patients} // Cast to Patient[] if needed, but interfaces match roughly
+          data={patients}
           onDataChange={handleDataChange}
-          sheetName={selectedMonth} // Pass selected month to table
-          poliType="umum" // Explicitly pass 'umum' to fix build error
+          sheetName={selectedMonth} // Pass chosen month
+          poliType={poliType} // Pass chosen poli
         />
       )}
     </Box>
