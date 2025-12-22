@@ -171,8 +171,9 @@ export default function DashboardPage() {
       >
         <Box>
           <Typography
-            variant="h4"
+            variant="h1"
             fontWeight="bold"
+            fontSize={34}
             sx={{ mb: 1, color: "#111827" }}
           >
             Dashboard Overview
