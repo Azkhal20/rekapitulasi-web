@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -11,6 +11,7 @@ import {
   Select,
   MenuItem,
   Paper,
+  SelectChangeEvent,
 } from "@mui/material";
 import PatientDataTable from "@/components/PatientDataTable";
 import { patientService } from "@/services/patientService"; // Use Service instead of lib
@@ -47,18 +48,17 @@ export default function PatientsPage() {
     }
   }, []);
 
-  const handleMonthChange = (e: any) => {
+  const handleMonthChange = (e: SelectChangeEvent<string>) => {
     const newMonth = e.target.value;
     setSelectedMonth(newMonth);
     localStorage.setItem("selectedMonthPatients", newMonth);
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       // Fetch using the monthly-aware service (Default to 'umum' for legacy page)
-      // Note: Make sure selectedMonth state is up to date before calling this
       const data = await patientService.getAllPatients(selectedMonth, "umum");
       setPatients(data);
     } catch (err) {
@@ -71,12 +71,12 @@ export default function PatientsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth]);
 
   // Reload when month changes
   useEffect(() => {
     loadData();
-  }, [selectedMonth]);
+  }, [loadData]);
 
   const handleDataChange = () => {
     loadData();
@@ -165,10 +165,10 @@ export default function PatientsPage() {
         </Alert>
       ) : (
         <PatientDataTable
-          data={patients} // Cast to Patient[] if needed, but interfaces match roughly
+          data={patients}
           onDataChange={handleDataChange}
-          sheetName={selectedMonth} // Pass selected month to table
-          poliType="umum" // Explicitly pass 'umum' to fix build error
+          sheetName={selectedMonth}
+          poliType="umum"
         />
       )}
     </Box>

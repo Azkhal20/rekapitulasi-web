@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { PatientData } from "@/services/patientService";
+import { Patient } from "@/types/patient"; // Import type Patient
 
 interface PatientFormDialogProps {
   open: boolean;
@@ -139,18 +140,6 @@ export default function PatientFormDialog({
     OBAT: "",
   });
 
-  // Calculate Sorted Patients (Most Recent First) for Auto-Number Logic
-  const sortedPatients = useMemo(() => {
-    return [...existingPatients].sort((a, b) => {
-      // Sort by ID Descending (Assuming ID is chronological)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const idA = Number((a as any).id) || 0;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const idB = Number((b as any).id) || 0;
-      return idB - idA;
-    });
-  }, [existingPatients]);
-
   // Effect: Auto Calculate HARI, BULAN, and 16-15 when TANGGAL changes (Only in ADD mode)
   useEffect(() => {
     if (mode === "add" && formData.TANGGAL && open) {
@@ -165,23 +154,26 @@ export default function PatientFormDialog({
         // Normalized Input Date String (YYYY-MM-DD from parser) to compare
         const inputDateStr = formData.TANGGAL; // Assume clean ISO
 
+        // Cast to any[] once to avoid union type issues with heterogeneous keys
+        const patients = (existingPatients as Record<string, unknown>[]) || [];
+
         // === 1. Auto Calc HARI (Reset per Hari) ===
-        const recordsSameDay = existingPatients.filter((p) => {
-          const pDateIso = parseDateFromSheet(p.TANGGAL);
+        const recordsSameDay = patients.filter((p) => {
+          const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
           return pDateIso === inputDateStr;
         });
 
         let nextHari = 1;
         if (recordsSameDay.length > 0) {
           const maxHari = Math.max(
-            ...recordsSameDay.map((r) => parseInt(r.HARI) || 0)
+            ...recordsSameDay.map((r) => parseInt(String(r.HARI || "0")) || 0)
           );
           nextHari = maxHari + 1;
         }
 
         // === 2. Auto Calc BULAN (Reset per Bulan) ===
-        const recordsSameMonth = existingPatients.filter((p) => {
-          const pDateIso = parseDateFromSheet(p.TANGGAL);
+        const recordsSameMonth = patients.filter((p) => {
+          const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
           if (!pDateIso) return false;
           const pDate = new Date(pDateIso);
           return pDate.getFullYear() === year && pDate.getMonth() === month;
@@ -190,7 +182,9 @@ export default function PatientFormDialog({
         let nextBulan = 1;
         if (recordsSameMonth.length > 0) {
           const maxBulan = Math.max(
-            ...recordsSameMonth.map((r) => parseInt(r.BULAN) || 0)
+            ...recordsSameMonth.map(
+              (r) => parseInt(String(r.BULAN || "0")) || 0
+            )
           );
           nextBulan = maxBulan + 1;
         }
@@ -208,8 +202,8 @@ export default function PatientFormDialog({
         }
 
         // Filter Existing Patients dalam siklus ini
-        const recordsInCycle = existingPatients.filter((p) => {
-          const pDateIso = parseDateFromSheet(p.TANGGAL);
+        const recordsInCycle = patients.filter((p) => {
+          const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
           if (!pDateIso) return false;
 
           const pDate = new Date(pDateIso);
@@ -224,10 +218,8 @@ export default function PatientFormDialog({
         if (recordsInCycle.length > 0) {
           const maxVal = Math.max(
             ...recordsInCycle.map((r) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const rawVal =
-                (r as any)["16-15"] || r.ENAM_BELAS_LIMA_BELAS || "0";
-              const val = parseInt(rawVal);
+              const rawVal = r["16-15"] || r.ENAM_BELAS_LIMA_BELAS || "0";
+              const val = parseInt(String(rawVal));
               return isNaN(val) ? 0 : val;
             })
           );
