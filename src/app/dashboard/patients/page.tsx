@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -11,6 +11,7 @@ import {
   Select,
   MenuItem,
   Paper,
+  SelectChangeEvent,
 } from "@mui/material";
 import PatientDataTable from "@/components/PatientDataTable";
 import { patientService } from "@/services/patientService"; // Use Service instead of lib
@@ -36,9 +37,24 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER"); // Default start
+  // Initialize from localStorage or default
+  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER");
 
-  const loadData = async () => {
+  // Effect to load saved month on mount
+  useEffect(() => {
+    const savedMonth = localStorage.getItem("selectedMonthPatients");
+    if (savedMonth && MONTHS.includes(savedMonth)) {
+      setSelectedMonth(savedMonth);
+    }
+  }, []);
+
+  const handleMonthChange = (e: SelectChangeEvent<string>) => {
+    const newMonth = e.target.value;
+    setSelectedMonth(newMonth);
+    localStorage.setItem("selectedMonthPatients", newMonth);
+  };
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -55,12 +71,12 @@ export default function PatientsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth]);
 
   // Reload when month changes
   useEffect(() => {
     loadData();
-  }, [selectedMonth]);
+  }, [loadData]);
 
   const handleDataChange = () => {
     loadData();
@@ -97,7 +113,7 @@ export default function PatientsPage() {
             <Select
               value={selectedMonth}
               label="Pilih Bulan"
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={handleMonthChange}
             >
               {MONTHS.map((month) => (
                 <MenuItem key={month} value={month}>
@@ -149,10 +165,10 @@ export default function PatientsPage() {
         </Alert>
       ) : (
         <PatientDataTable
-          data={patients} // Cast to Patient[] if needed, but interfaces match roughly
+          data={patients}
           onDataChange={handleDataChange}
-          sheetName={selectedMonth} // Pass selected month to table
-          poliType="umum" // Explicitly pass 'umum' to fix build error
+          sheetName={selectedMonth}
+          poliType="umum"
         />
       )}
     </Box>

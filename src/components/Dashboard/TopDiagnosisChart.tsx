@@ -184,7 +184,7 @@ export default function TopDiagnosisChart({
         >
           <Box>
             <Typography
-              variant="h6"
+              variant="h4"
               fontWeight="bold"
               sx={{ color: "#374151" }}
             >

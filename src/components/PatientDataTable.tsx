@@ -82,8 +82,7 @@ function getRowValue(
   row: Patient | PatientData,
   column: string
 ): string | number {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (row as any)[column];
+  return (row as Record<string, unknown>)[column] as string | number;
 }
 
 export default function PatientDataTable({
@@ -159,7 +158,7 @@ export default function PatientDataTable({
         month: "short",
         year: "numeric",
       });
-    } catch (e) {
+    } catch {
       return dateString;
     }
   };
@@ -255,23 +254,16 @@ export default function PatientDataTable({
     let nextNum = "1";
     if (data.length > 0) {
       // Sort by ID descending to get the latest entry added
-      // Fix: Type safe access to id
       const sorted = [...data].sort((a, b) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const idA = Number((a as any).id) || 0;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const idB = Number((b as any).id) || 0;
+        const idA = Number((a as Record<string, unknown>).id) || 0;
+        const idB = Number((b as Record<string, unknown>).id) || 0;
         return idB - idA;
       });
-      const lastEntry = sorted[0];
+      const lastEntry = sorted[0] as Record<string, unknown>;
 
-      // Fix: Safe access to TAHUN
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const lastTahun = (lastEntry as any).TAHUN;
+      const lastTahun = lastEntry.TAHUN;
 
       if (lastEntry && lastTahun) {
-        // Try parsing previous TAHUN value
-        // FIX: parseInt expects string, so we convert explicitly
         const lastVal = parseInt(String(lastTahun));
         if (!isNaN(lastVal)) {
           nextNum = (lastVal + 1).toString();
@@ -289,9 +281,7 @@ export default function PatientDataTable({
     setNextTahun("");
     setFormMode("edit");
 
-    // Helper access
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p = patient as any;
+    const p = patient as Record<string, unknown>;
 
     // MAPPING FIX: Sesuaikan dengan Key dari Google Sheet JSON
     const patientData: PatientData = {
@@ -322,12 +312,13 @@ export default function PatientDataTable({
   };
 
   const handleDeleteClick = (patient: Patient | PatientData) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p = patient as any;
+    const p = patient as Record<string, unknown>;
 
     MySwal.fire({
       title: "Apakah Anda yakin?",
-      text: `Anda akan menghapus data pasien ${p.NAMA}. Data tidak dapat dikembalikan!`,
+      text: `Anda akan menghapus data pasien ${String(
+        p.NAMA || "ini"
+      )}. Data tidak dapat dikembalikan!`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#FF4C51",
@@ -391,20 +382,19 @@ export default function PatientDataTable({
 
       // MAPPING FIX FOR WRITE OPERATIONS
       // Google Sheets backend V5 expects Header names as keys (e.g., "OBS TTV", not "OBS_TTV")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const payload: any = { ...formData };
+      const payload: Record<string, unknown> = { ...formData };
 
       // Remap internal keys to Google Sheet keys
-      if (payload.OBS_TTV) {
-        payload["OBS TTV"] = payload.OBS_TTV;
+      if (formData.OBS_TTV) {
+        payload["OBS TTV"] = formData.OBS_TTV;
         delete payload.OBS_TTV;
       }
-      if (payload.ICD10) {
-        payload["ICD-10"] = payload.ICD10;
+      if (formData.ICD10) {
+        payload["ICD-10"] = formData.ICD10;
         delete payload.ICD10;
       }
-      if (payload.ENAM_BELAS_LIMA_BELAS) {
-        payload["16-15"] = payload.ENAM_BELAS_LIMA_BELAS;
+      if (formData.ENAM_BELAS_LIMA_BELAS) {
+        payload["16-15"] = formData.ENAM_BELAS_LIMA_BELAS;
         delete payload.ENAM_BELAS_LIMA_BELAS;
       }
 
@@ -417,13 +407,20 @@ export default function PatientDataTable({
 
       if (formMode === "add") {
         // PASS SHEET NAME TO SERVICE
-        await patientService.addPatient(payload, sheetName, poliType);
+        await patientService.addPatient(
+          payload as unknown as Omit<PatientData, "id">,
+          sheetName,
+          poliType
+        );
 
         Swal.close();
         setTimeout(() => {
           Toast.fire({
             icon: "success",
             title: "Data pasien berhasil ditambahkan",
+          }).then(() => {
+            // Force Reload to ensure fresh data for auto-increment logic
+            window.location.reload();
           });
         }, 300);
       } else {
@@ -431,7 +428,7 @@ export default function PatientDataTable({
           // PASS SHEET NAME TO SERVICE
           await patientService.updatePatient(
             selectedPatient.id,
-            payload,
+            payload as unknown as Omit<PatientData, "id">,
             sheetName
           );
 
@@ -440,6 +437,9 @@ export default function PatientDataTable({
             Toast.fire({
               icon: "success",
               title: "Data pasien berhasil diperbarui",
+            }).then(() => {
+              // Force Reload
+              window.location.reload();
             });
           }, 300);
         }
@@ -447,7 +447,7 @@ export default function PatientDataTable({
 
       setFormDialogOpen(false);
       setSelectedPatient(null);
-
+      // onDataChange call is now redundant if we reload, but kept for safety if reload removed later
       if (onDataChange) {
         onDataChange();
       }
@@ -733,7 +733,7 @@ export default function PatientDataTable({
                       alignItems="center"
                     >
                       <Typography color="text.secondary">
-                        Tidak ada data yang sesuai
+                        Tidak ada data di bulan ini
                       </Typography>
                     </Box>
                   </TableCell>
@@ -846,6 +846,7 @@ export default function PatientDataTable({
         initialData={selectedPatient}
         mode={formMode}
         defaultTahun={nextTahun}
+        existingPatients={data} // Pass all data for calculation
       />
     </Box>
   );
