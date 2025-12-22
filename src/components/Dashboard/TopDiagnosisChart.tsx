@@ -3,15 +3,11 @@
 import { useEffect, useState } from "react";
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   FormControl,
   Select,
   MenuItem,
   CircularProgress,
-  useTheme,
-  Stack,
   Divider,
 } from "@mui/material";
 import {
@@ -57,7 +53,6 @@ interface TopDiagnosisChartProps {
 export default function TopDiagnosisChart({
   poliType,
 }: TopDiagnosisChartProps) {
-  const theme = useTheme();
   // Default to current month dynamically
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName());
 
@@ -71,9 +66,9 @@ export default function TopDiagnosisChart({
   const barColor = poliType === "gigi" ? "#EC4899" : "#4F46E5"; // Pink vs Indigo
 
   // Logic to check if cell is filled (truthy, not empty string, not dash)
-  const isFilled = (val: any) => {
+  const isFilled = (val: unknown) => {
     if (!val) return false;
-    const s = val.toString().trim();
+    const s = String(val).trim();
     return s !== "" && s !== "-" && s !== "0";
   };
 
@@ -164,292 +159,301 @@ export default function TopDiagnosisChart({
   };
 
   return (
-    <Card
-      sx={{
-        borderRadius: 4,
-        boxShadow: "0 4px 20px 0 rgba(0,0,0,0.05)",
-        mt: 3,
-        width: "100%",
-      }}
-    >
-      <CardContent sx={{ p: 4 }}>
-        {/* Header Section */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={4}
-          flexWrap="wrap"
-          gap={2}
-        >
-          <Box>
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-              sx={{ color: "#374151" }}
-            >
-              Analisis Data Bulanan
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Statistik Poli {poliType === "gigi" ? "Gigi" : "Umum"} - Bulan{" "}
-              {selectedMonth}
-            </Typography>
-          </Box>
-
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <Select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              sx={{
-                borderRadius: 2,
-                bgcolor: "#F9FAFB",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#E5E7EB",
-                },
-                fontWeight: 600,
-              }}
-            >
-              {MONTHS.map((month) => (
-                <MenuItem key={month} value={month}>
-                  {month}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+    <Box sx={{ width: "100%" }}>
+      {/* Header Section */}
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={4}
+        flexWrap="wrap"
+        gap={2}
+      >
+        <Box>
+          <Typography
+            variant="h5"
+            fontWeight="800"
+            sx={{ color: "#1E293B", letterSpacing: "-0.02em" }}
+          >
+            Analisis Data Bulanan
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontWeight: 500 }}
+          >
+            Statistik Poli {poliType.toUpperCase()} — {selectedMonth}
+          </Typography>
         </Box>
 
-        {loading ? (
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            height={350}
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            sx={{
+              borderRadius: "10px",
+              bgcolor: "#F1F5F9",
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "#E2E8F0",
+              },
+              fontWeight: 600,
+              fontSize: "0.875rem",
+              "&:hover .MuiOutlinedInput-notchedOutline": {
+                borderColor: "primary.main",
+              },
+            }}
           >
-            <CircularProgress sx={{ color: barColor }} />
-          </Box>
-        ) : (
-          <Box
-            display="flex"
-            flexDirection={{ xs: "column", md: "row" }}
-            gap={4}
-            width="100%"
-          >
-            {/* LEFT: Top 10 Diagnosis (Bar Chart) - FLEX GROW to fill space */}
-            <Box flex={1} minWidth={0}>
-              <Typography
-                variant="subtitle1"
-                fontWeight="bold"
-                gutterBottom
-                sx={{ mb: 2 }}
-              >
-                10 Diagnosis Terbanyak
-              </Typography>
+            {MONTHS.map((month) => (
+              <MenuItem key={month} value={month} sx={{ fontWeight: 500 }}>
+                {month}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
-              {chartData.length === 0 ? (
-                <Box
-                  display="flex"
-                  justifyContent="center"
-                  alignItems="center"
-                  height={300}
-                  bgcolor="#F9FAFB"
-                  borderRadius={2}
-                >
-                  <Typography color="text.secondary">
-                    Belum ada data diagnosis
+      {loading ? (
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          height={400}
+        >
+          <CircularProgress size={32} sx={{ color: barColor }} />
+        </Box>
+      ) : (
+        <Box
+          display="flex"
+          flexDirection={{ xs: "column", lg: "row" }}
+          gap={5}
+          width="100%"
+        >
+          {/* LEFT: Top 10 Diagnosis (Bar Chart) */}
+          <Box flex={1.5} minWidth={0}>
+            <Typography
+              variant="subtitle2"
+              fontWeight="800"
+              color="#64748B"
+              sx={{
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                mb: 3,
+              }}
+            >
+              10 Diagnosis Terbanyak
+            </Typography>
+
+            {chartData.length === 0 ? (
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                height={320}
+                bgcolor="#F8FAFC"
+                borderRadius="16px"
+                border="1px dashed #E2E8F0"
+              >
+                <Typography color="text.secondary" variant="body2">
+                  Belum ada data diagnosis tersedia
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ width: "100%", height: 350 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={chartData}
+                    margin={{ top: 0, right: 30, left: 5, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="4 4"
+                      horizontal={false}
+                      vertical={true}
+                      stroke="#F1F5F9"
+                    />
+                    <XAxis type="number" hide />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={130}
+                      tick={{ fontSize: 11, fill: "#64748B", fontWeight: 500 }}
+                      tickFormatter={(val) => truncateText(val, 22)}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      content={<CustomTooltip />}
+                      cursor={{ fill: "rgba(79, 70, 229, 0.04)" }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      radius={[0, 6, 6, 0]}
+                      barSize={18}
+                      animationDuration={1500}
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={barColor} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+          </Box>
+
+          {/* RIGHT: Demografi Pasien */}
+          <Box flex={1} minWidth={0}>
+            <Typography
+              variant="subtitle2"
+              fontWeight="800"
+              color="#64748B"
+              sx={{
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                mb: 3,
+              }}
+            >
+              Demografi Gender
+            </Typography>
+
+            <Box
+              sx={{
+                p: 3,
+                bgcolor: "#F8FAFC",
+                borderRadius: "20px",
+                border: "1px solid #F1F5F9",
+                height: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+              }}
+            >
+              {/* Laki-laki Progress Group */}
+              <Box>
+                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: "10px",
+                        bgcolor: "#E0F2FE",
+                        color: "#0EA5E9",
+                      }}
+                    >
+                      <ManIcon fontSize="small" />
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      fontWeight="700"
+                      color="#334155"
+                    >
+                      Laki-laki
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" fontWeight="800" color="#0EA5E9">
+                    {genderStats.L}
                   </Typography>
                 </Box>
-              ) : (
-                <Box sx={{ width: "100%", height: 350 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      layout="vertical"
-                      data={chartData}
-                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        horizontal={true}
-                        vertical={false}
-                        stroke="#E5E7EB"
-                      />
-                      <XAxis type="number" hide />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={130}
-                        tick={{ fontSize: 11, fill: "#6B7280" }}
-                        tickFormatter={(val) => truncateText(val, 25)}
-                        interval={0}
-                      />
-                      <Tooltip
-                        content={<CustomTooltip />}
-                        cursor={{ fill: "rgba(0,0,0,0.04)" }}
-                      />
-                      <Bar
-                        dataKey="count"
-                        radius={[0, 4, 4, 0]}
-                        barSize={20}
-                        animationDuration={1500}
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={barColor} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              )}
-            </Box>
-
-            {/* RIGHT: Gender Ratio (Demografi) - FIXED WIDTH on desktop */}
-            <Box width={{ xs: "100%", md: "320px" }} flexShrink={0}>
-              <Typography
-                variant="subtitle1"
-                fontWeight="bold"
-                gutterBottom
-                sx={{ mb: 2 }}
-              >
-                Demografi Pasien
-              </Typography>
-
-              <Box
-                sx={{
-                  p: 3,
-                  bgcolor: "#F9FAFB",
-                  borderRadius: 3,
-                  border: "1px dashed #E5E7EB",
-                  height: "350px", // Match chart height
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                }}
-              >
-                {/* Gender Stats */}
-                <Stack spacing={3}>
-                  {/* Laki-laki */}
-                  <Box
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="space-between"
-                  >
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          p: 1,
-                          bgcolor: "#E0F2FE",
-                          borderRadius: "12px",
-                          color: "#0EA5E9",
-                        }}
-                      >
-                        <ManIcon />
-                      </Box>
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">
-                          Laki-laki
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          fontWeight="bold"
-                          color="#0EA5E9"
-                        >
-                          {genderStats.L}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      fontWeight="bold"
-                      color="text.secondary"
-                    >
-                      {genderStats.L + genderStats.P > 0
-                        ? Math.round(
-                            (genderStats.L / (genderStats.L + genderStats.P)) *
-                              100
-                          )
-                        : 0}
-                      %
-                    </Typography>
-                  </Box>
-
-                  <Divider />
-
-                  {/* Perempuan */}
-                  <Box
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="space-between"
-                  >
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          p: 1,
-                          bgcolor: "#FCE7F3",
-                          borderRadius: "12px",
-                          color: "#EC4899",
-                        }}
-                      >
-                        <WomanIcon />
-                      </Box>
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">
-                          Perempuan
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          fontWeight="bold"
-                          color="#EC4899"
-                        >
-                          {genderStats.P}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      fontWeight="bold"
-                      color="text.secondary"
-                    >
-                      {genderStats.L + genderStats.P > 0
-                        ? Math.round(
-                            (genderStats.P / (genderStats.L + genderStats.P)) *
-                              100
-                          )
-                        : 0}
-                      %
-                    </Typography>
-                  </Box>
-
-                  {/* Total Info */}
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 8,
+                    bgcolor: "#E2E8F0",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                  }}
+                >
                   <Box
                     sx={{
-                      mt: 2,
-                      textAlign: "center",
-                      p: 1.5,
-                      bgcolor: "white",
-                      borderRadius: 2,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                      width: `${
+                        genderStats.L + genderStats.P > 0
+                          ? (genderStats.L / (genderStats.L + genderStats.P)) *
+                            100
+                          : 0
+                      }%`,
+                      height: "100%",
+                      bgcolor: "#0EA5E9",
+                      borderRadius: 4,
+                      transition: "width 1s ease-in-out",
                     }}
-                  >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      display="block"
+                  />
+                </Box>
+              </Box>
+
+              {/* Perempuan Progress Group */}
+              <Box>
+                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: "10px",
+                        bgcolor: "#FCE7F3",
+                        color: "#EC4899",
+                      }}
                     >
-                      TOTAL PASIEN BULAN INI
-                    </Typography>
+                      <WomanIcon fontSize="small" />
+                    </Box>
                     <Typography
-                      variant="h4"
-                      fontWeight="bold"
-                      color="text.primary"
+                      variant="body2"
+                      fontWeight="700"
+                      color="#334155"
                     >
-                      {(genderStats.L + genderStats.P).toLocaleString()}
+                      Perempuan
                     </Typography>
                   </Box>
-                </Stack>
+                  <Typography variant="body2" fontWeight="800" color="#EC4899">
+                    {genderStats.P}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 8,
+                    bgcolor: "#E2E8F0",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: `${
+                        genderStats.L + genderStats.P > 0
+                          ? (genderStats.P / (genderStats.L + genderStats.P)) *
+                            100
+                          : 0
+                      }%`,
+                      height: "100%",
+                      bgcolor: "#EC4899",
+                      borderRadius: 4,
+                      transition: "width 1s ease-in-out",
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              <Divider sx={{ my: 1, borderStyle: "dashed" }} />
+
+              <Box sx={{ textAlign: "center" }}>
+                <Typography
+                  variant="caption"
+                  fontWeight="700"
+                  color="#94A3B8"
+                  sx={{ textTransform: "uppercase", letterSpacing: "0.1em" }}
+                >
+                  Total Kunjungan
+                </Typography>
+                <Typography variant="h4" fontWeight="900" color="#1E293B">
+                  {(genderStats.L + genderStats.P).toLocaleString()}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Pasien Terdaftar
+                </Typography>
               </Box>
             </Box>
           </Box>
-        )}
-      </CardContent>
-    </Card>
+        </Box>
+      )}
+    </Box>
   );
 }
