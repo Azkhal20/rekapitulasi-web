@@ -36,13 +36,29 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER"); // Default start
+  // Initialize from localStorage or default
+  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER");
+
+  // Effect to load saved month on mount
+  useEffect(() => {
+    const savedMonth = localStorage.getItem("selectedMonthPatients");
+    if (savedMonth && MONTHS.includes(savedMonth)) {
+      setSelectedMonth(savedMonth);
+    }
+  }, []);
+
+  const handleMonthChange = (e: any) => {
+    const newMonth = e.target.value;
+    setSelectedMonth(newMonth);
+    localStorage.setItem("selectedMonthPatients", newMonth);
+  };
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       // Fetch using the monthly-aware service (Default to 'umum' for legacy page)
+      // Note: Make sure selectedMonth state is up to date before calling this
       const data = await patientService.getAllPatients(selectedMonth, "umum");
       setPatients(data);
     } catch (err) {
@@ -97,7 +113,7 @@ export default function PatientsPage() {
             <Select
               value={selectedMonth}
               label="Pilih Bulan"
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={handleMonthChange}
             >
               {MONTHS.map((month) => (
                 <MenuItem key={month} value={month}>

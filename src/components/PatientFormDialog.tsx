@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -24,11 +24,11 @@ interface PatientFormDialogProps {
   onSubmit: (data: Omit<PatientData, "id">) => Promise<void>;
   initialData?: PatientData | null;
   mode: "add" | "edit";
-  defaultTahun?: string; // New Prop to override default year logic
+  defaultTahun?: string;
+  existingPatients?: PatientData[] | Patient[]; // Use strict types if possible
 }
 
 // Helper: Convert "YYYY-MM-DD" to "DD MMM YYYY" (Indonesian)
-// Example: "2025-12-15" -> "15 Des 2025"
 const formatDateForSheet = (isoDate: string): string => {
   if (!isoDate || !isoDate.includes("-")) return isoDate;
   try {
@@ -45,49 +45,68 @@ const formatDateForSheet = (isoDate: string): string => {
 };
 
 // Helper: Convert "DD MMM YYYY" (Indonesian) to "YYYY-MM-DD"
-// Example: "15 Des 2025" -> "2025-12-15"
+// Enhanced Parser to be more robust
 const parseDateFromSheet = (displayDate: string): string => {
   if (!displayDate) return "";
-  // Check if already ISO
-  if (displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) return displayDate;
+  const cleanDate = displayDate.trim();
 
-  // Manual map for Indonesian short months
+  // Already ISO?
+  if (cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) return cleanDate;
+
+  // Case insensitive & flexible map
   const MONTH_MAP: Record<string, string> = {
-    Jan: "01",
-    Feb: "02",
-    Mar: "03",
-    Apr: "04",
-    Mei: "05",
-    Jun: "06",
-    Jul: "07",
-    Agu: "08",
-    Sep: "09",
-    Okt: "10",
-    Nov: "11",
-    Des: "12",
+    jan: "01",
+    feb: "02",
+    mar: "03",
+    apr: "04",
+    mei: "05",
+    jun: "06",
+    jul: "07",
+    agu: "08",
+    sep: "09",
+    okt: "10",
+    nov: "11",
+    des: "12",
+    januari: "01",
+    februari: "02",
+    maret: "03",
+    april: "04",
+    agustus: "08",
+    september: "09",
+    oktober: "10",
+    november: "11",
+    desember: "12",
   };
 
   try {
-    // Expected format: "15 Des 2025"
-    const parts = displayDate.split(" ");
-    if (parts.length === 3) {
+    // Split by any whitespace char (including non-breaking space)
+    const parts = cleanDate.split(/\s+/);
+
+    if (parts.length >= 3) {
       const day = parts[0].padStart(2, "0");
-      const monthStr = parts[1];
+      const monthStr = parts[1].toLowerCase();
       const year = parts[2];
-      const month = MONTH_MAP[monthStr];
-      if (month) {
-        return `${year}-${month}-${day}`;
+
+      let month = MONTH_MAP[monthStr];
+
+      // Partial match fallback (e.g. "Febr")
+      if (!month) {
+        const key = Object.keys(MONTH_MAP).find(
+          (k) => k.startsWith(monthStr) || monthStr.startsWith(k)
+        );
+        if (key) month = MONTH_MAP[key];
       }
+
+      if (month) return `${year}-${month}-${day}`;
     }
-    // Fallback if parsing fails (maybe english month?)
-    const date = new Date(displayDate);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split("T")[0];
-    }
+
+    // Fallback JS Date parser
+    const date = new Date(cleanDate);
+    if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
   } catch (_) {
-    console.warn("Failed to parse date:", displayDate);
+    console.warn("Failed to parse date:", cleanDate);
   }
-  return ""; // Return empty if parsing completely fails to avoid invalid date inputs
+  return "";
 };
 
 export default function PatientFormDialog({
@@ -97,6 +116,7 @@ export default function PatientFormDialog({
   initialData,
   mode,
   defaultTahun,
+  existingPatients = [],
 }: PatientFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,38 +139,139 @@ export default function PatientFormDialog({
     OBAT: "",
   });
 
-  // Reset form when dialog opens/closes or initialData changes
+  // Calculate Sorted Patients (Most Recent First) for Auto-Number Logic
+  const sortedPatients = useMemo(() => {
+    return [...existingPatients].sort((a, b) => {
+      // Sort by ID Descending (Assuming ID is chronological)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const idA = Number((a as any).id) || 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const idB = Number((b as any).id) || 0;
+      return idB - idA;
+    });
+  }, [existingPatients]);
+
+  // Effect: Auto Calculate HARI, BULAN, and 16-15 when TANGGAL changes (Only in ADD mode)
+  useEffect(() => {
+    if (mode === "add" && formData.TANGGAL && open) {
+      try {
+        const inputDate = new Date(formData.TANGGAL);
+        if (isNaN(inputDate.getTime())) return;
+
+        const day = inputDate.getDate();
+        const month = inputDate.getMonth();
+        const year = inputDate.getFullYear();
+
+        // Normalized Input Date String (YYYY-MM-DD from parser) to compare
+        const inputDateStr = formData.TANGGAL; // Assume clean ISO
+
+        // === 1. Auto Calc HARI (Reset per Hari) ===
+        const recordsSameDay = existingPatients.filter((p) => {
+          const pDateIso = parseDateFromSheet(p.TANGGAL);
+          return pDateIso === inputDateStr;
+        });
+
+        let nextHari = 1;
+        if (recordsSameDay.length > 0) {
+          const maxHari = Math.max(
+            ...recordsSameDay.map((r) => parseInt(r.HARI) || 0)
+          );
+          nextHari = maxHari + 1;
+        }
+
+        // === 2. Auto Calc BULAN (Reset per Bulan) ===
+        const recordsSameMonth = existingPatients.filter((p) => {
+          const pDateIso = parseDateFromSheet(p.TANGGAL);
+          if (!pDateIso) return false;
+          const pDate = new Date(pDateIso);
+          return pDate.getFullYear() === year && pDate.getMonth() === month;
+        });
+
+        let nextBulan = 1;
+        if (recordsSameMonth.length > 0) {
+          const maxBulan = Math.max(
+            ...recordsSameMonth.map((r) => parseInt(r.BULAN) || 0)
+          );
+          nextBulan = maxBulan + 1;
+        }
+
+        // === 3. Auto Calc 16-15 (Reset Tgl 16) ===
+        // Tentukan Awal Siklus (Cycle Start Date)
+        let cycleStartTime: number;
+
+        if (day >= 16) {
+          // Siklus bulan ini, mulai tanggal 16
+          cycleStartTime = new Date(year, month, 16).setHours(0, 0, 0, 0);
+        } else {
+          // Siklus bulan lalu, mulai tanggal 16 bulan lalu
+          cycleStartTime = new Date(year, month - 1, 16).setHours(0, 0, 0, 0);
+        }
+
+        // Filter Existing Patients dalam siklus ini
+        const recordsInCycle = existingPatients.filter((p) => {
+          const pDateIso = parseDateFromSheet(p.TANGGAL);
+          if (!pDateIso) return false;
+
+          const pDate = new Date(pDateIso);
+          if (isNaN(pDate.getTime())) return false;
+
+          // Compare Time
+          return pDate.setHours(0, 0, 0, 0) >= cycleStartTime;
+        });
+
+        // Find Max Value in Cycle for 16-15
+        let next1615 = 1;
+        if (recordsInCycle.length > 0) {
+          const maxVal = Math.max(
+            ...recordsInCycle.map((r) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const rawVal =
+                (r as any)["16-15"] || r.ENAM_BELAS_LIMA_BELAS || "0";
+              const val = parseInt(rawVal);
+              return isNaN(val) ? 0 : val;
+            })
+          );
+          next1615 = maxVal + 1;
+        } else {
+          next1615 = 1;
+        }
+
+        // Update Form State (All fields at once to avoid flicker)
+        setFormData((prev) => ({
+          ...prev,
+          HARI: nextHari.toString(),
+          BULAN: nextBulan.toString(),
+          ENAM_BELAS_LIMA_BELAS: next1615.toString(),
+        }));
+      } catch (e) {
+        console.error("Auto calc error", e);
+      }
+    }
+  }, [formData.TANGGAL, mode, open, existingPatients]);
+
+  // Reset form
   useEffect(() => {
     if (open) {
       if (initialData && mode === "edit") {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, ...rest } = initialData;
-
-        // Convert Date for Input Field
-        // Data from sheet: "15 Des 2025" -> Input needs "2025-12-15"
         const convertedData = { ...rest };
         if (convertedData.TANGGAL) {
           convertedData.TANGGAL = parseDateFromSheet(convertedData.TANGGAL);
         }
-
         setFormData(convertedData);
       } else {
-        // Auto-fill date fields for new patient
+        // ADD Mode
         const now = new Date();
-        const tanggal = now.toISOString().split("T")[0]; // YYYY-MM-DD
-
-        // AUTO NUMBERING LOGIC: Use defaultTahun prop if available, else fallback to current year
+        const tanggal = now.toISOString().split("T")[0];
         const tahun = defaultTahun || now.getFullYear().toString();
-
-        const bulan = ""; // Cleared
-        const hari = ""; // Cleared
 
         setFormData({
           TANGGAL: tanggal,
           TAHUN: tahun,
-          BULAN: bulan,
-          HARI: hari,
-          ENAM_BELAS_LIMA_BELAS: "",
+          BULAN: "",
+          HARI: "",
+          ENAM_BELAS_LIMA_BELAS: "", // Auto-calc will fill this
           L: "",
           P: "",
           NAMA: "",
@@ -172,50 +293,22 @@ export default function PatientFormDialog({
     field: keyof Omit<PatientData, "id">,
     value: string
   ) => {
-    setFormData((prev) => {
-      const updates = { ...prev, [field]: value };
-
-      // Auto-update related date fields if TANGGAL changes
-      if (field === "TANGGAL" && value) {
-        try {
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            // Disabled auto-fill for HARI and BULAN on date change based on request?
-            // User requested default values be cleared.
-            // If user selects a date, should we fill them?
-            // "data hari dan bulan nya diapus defaultnya, karena isinya adalah angka bukan nama hari atau bulannya"
-            // This implies they want to enter it manually OR the auto-calc was wrong.
-            // Let's keep auto-calc OFF for now as per "diapus defaultnya".
-            // If they want auto-calc, they usually say "fix the auto calc".
-            // updates.BULAN = date.toLocaleDateString("id-ID", { month: "long" });
-            // updates.HARI = date.toLocaleDateString("id-ID", { weekday: "long" });
-          }
-        } catch (_) {
-          // ignore invalid date during typing
-        }
-      }
-
-      return updates;
-    });
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      // PREPARE DATA FOR SHEET
-      // Convert "2025-12-15" -> "15 Des 2025"
       const dataToSubmit = { ...formData };
       if (dataToSubmit.TANGGAL) {
         dataToSubmit.TANGGAL = formatDateForSheet(dataToSubmit.TANGGAL);
       }
-
       await onSubmit(dataToSubmit);
     } catch (err) {
       console.error(err);
-      setError("Terjadi kesalahan saat menyimpan data. Silakan coba lagi.");
+      setError("Terjadi kesalahan saat menyimpan data.");
     } finally {
       setLoading(false);
     }
@@ -227,9 +320,7 @@ export default function PatientFormDialog({
       onClose={loading ? undefined : onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: { borderRadius: 5 },
-      }}
+      PaperProps={{ sx: { borderRadius: 5 } }}
     >
       <DialogTitle
         sx={{
@@ -275,6 +366,7 @@ export default function PatientFormDialog({
               </Typography>
             </Box>
 
+            {/* Tgl Section */}
             <TextField
               label="Tanggal"
               type="date"
@@ -285,31 +377,61 @@ export default function PatientFormDialog({
               InputLabelProps={{ shrink: true }}
             />
 
+            {/* Urutan Baru: Tahun, Bulan, Hari, 16-15 */}
             <Stack
               direction="row"
               spacing={2}
               sx={{
                 gridColumn: { xs: "1fr", sm: "span 2" },
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr",
               }}
             >
               <TextField
-                label="Hari"
-                value={formData.HARI}
-                onChange={(e) => handleChange("HARI", e.target.value)}
+                label="Tahun"
+                value={formData.TAHUN}
+                onChange={(e) => handleChange("TAHUN", e.target.value)}
+                helperText="*Auto +1"
               />
               <TextField
                 label="Bulan"
                 value={formData.BULAN}
                 onChange={(e) => handleChange("BULAN", e.target.value)}
+                helperText="*Auto Reset /Bulan"
+                placeholder="Auto"
+                focused={mode === "add"}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                  },
+                }}
               />
               <TextField
-                label="Tahun"
-                placeholder="No. Urut"
-                value={formData.TAHUN}
-                onChange={(e) => handleChange("TAHUN", e.target.value)}
-                helperText="Auto +1 dari data terakhir"
+                label="Hari"
+                value={formData.HARI}
+                onChange={(e) => handleChange("HARI", e.target.value)}
+                helperText="*Auto Reset /Hari"
+                placeholder="Auto"
+                focused={mode === "add"}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                  },
+                }}
+              />
+              <TextField
+                label="16-15"
+                value={formData.ENAM_BELAS_LIMA_BELAS}
+                onChange={(e) =>
+                  handleChange("ENAM_BELAS_LIMA_BELAS", e.target.value)
+                }
+                helperText="*Auto Reset Tanggal 16"
+                focused={mode === "add"}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                  },
+                }}
               />
             </Stack>
 

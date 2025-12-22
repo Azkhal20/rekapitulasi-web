@@ -424,6 +424,9 @@ export default function PatientDataTable({
           Toast.fire({
             icon: "success",
             title: "Data pasien berhasil ditambahkan",
+          }).then(() => {
+            // Force Reload to ensure fresh data for auto-increment logic
+            window.location.reload();
           });
         }, 300);
       } else {
@@ -440,6 +443,9 @@ export default function PatientDataTable({
             Toast.fire({
               icon: "success",
               title: "Data pasien berhasil diperbarui",
+            }).then(() => {
+              // Force Reload
+              window.location.reload();
             });
           }, 300);
         }
@@ -447,7 +453,7 @@ export default function PatientDataTable({
 
       setFormDialogOpen(false);
       setSelectedPatient(null);
-
+      // onDataChange call is now redundant if we reload, but kept for safety if reload removed later
       if (onDataChange) {
         onDataChange();
       }
@@ -733,7 +739,7 @@ export default function PatientDataTable({
                       alignItems="center"
                     >
                       <Typography color="text.secondary">
-                        Tidak ada data yang sesuai
+                        Tidak ada data di bulan ini
                       </Typography>
                     </Box>
                   </TableCell>
@@ -846,6 +852,7 @@ export default function PatientDataTable({
         initialData={selectedPatient}
         mode={formMode}
         defaultTahun={nextTahun}
+        existingPatients={data} // Pass all data for calculation
       />
     </Box>
   );
