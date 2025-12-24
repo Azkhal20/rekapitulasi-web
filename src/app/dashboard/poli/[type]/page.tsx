@@ -20,10 +20,7 @@ import {
   PoliType,
 } from "@/services/patientService";
 
-// Custom Order as requested: Starting from NOVEMBER
 const MONTHS = [
-  "NOVEMBER",
-  "DESEMBER",
   "JANUARI",
   "FEBRUARI",
   "MARET",
@@ -34,7 +31,11 @@ const MONTHS = [
   "AGUSTUS",
   "SEPTEMBER",
   "OKTOBER",
+  "NOVEMBER",
+  "DESEMBER",
 ];
+
+const YEARS = ["2025", "2026", "2027", "2028"];
 
 export default function PoliPage() {
   const params = useParams();
@@ -47,14 +48,42 @@ export default function PoliPage() {
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER"); // Default start
+
+  // Load dari localStorage atau default ke current month/year
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`poli_${poliType}_month`);
+      if (saved && MONTHS.includes(saved)) return saved;
+    }
+    return new Date()
+      .toLocaleDateString("id-ID", { month: "long" })
+      .toUpperCase();
+  });
+
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`poli_${poliType}_year`);
+      if (saved && YEARS.includes(saved)) return saved;
+    }
+    return new Date().getFullYear().toString();
+  });
+
+  // Save ke localStorage setiap kali month atau year berubah
+  useEffect(() => {
+    localStorage.setItem(`poli_${poliType}_month`, selectedMonth);
+  }, [selectedMonth, poliType]);
+
+  useEffect(() => {
+    localStorage.setItem(`poli_${poliType}_year`, selectedYear);
+  }, [selectedYear, poliType]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       // Fetch using the monthly-aware service AND poliType
-      const data = await patientService.getAllPatients(selectedMonth, poliType);
+      const sheetName = `${selectedMonth} ${selectedYear}`;
+      const data = await patientService.getAllPatients(sheetName, poliType);
       setPatients(data);
     } catch (err) {
       console.error("Error loading patient data:", err);
@@ -63,7 +92,7 @@ export default function PoliPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, poliType]);
+  }, [selectedMonth, selectedYear, poliType]);
 
   // Reload when month or poli changes
   useEffect(() => {
@@ -125,28 +154,50 @@ export default function PoliPage() {
           </Box>
 
           <Typography variant="body1" color="text.secondary">
-            Bulan <strong>{selectedMonth}</strong> • Total: {patients.length}{" "}
-            pasien
+            Bulan{" "}
+            <strong>
+              {selectedMonth} {selectedYear}
+            </strong>{" "}
+            • Total: {patients.length} pasien
           </Typography>
         </Box>
 
-        {/* Month Selector */}
-        <Paper sx={{ p: 1, borderRadius: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Pilih Bulan</InputLabel>
-            <Select
-              value={selectedMonth}
-              label="Pilih Bulan"
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            >
-              {MONTHS.map((month) => (
-                <MenuItem key={month} value={month}>
-                  {month}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Paper>
+        {/* Filters */}
+        <Box display="flex" gap={2}>
+          <Paper sx={{ p: 1, borderRadius: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 100 }}>
+              <InputLabel>Tahun</InputLabel>
+              <Select
+                value={selectedYear}
+                label="Tahun"
+                onChange={(e) => setSelectedYear(e.target.value)}
+              >
+                {YEARS.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Paper>
+
+          <Paper sx={{ p: 1, borderRadius: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Pilih Bulan</InputLabel>
+              <Select
+                value={selectedMonth}
+                label="Pilih Bulan"
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {MONTHS.map((month) => (
+                  <MenuItem key={month} value={month}>
+                    {month}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Paper>
+        </Box>
       </Box>
 
       {loading ? (
@@ -191,7 +242,7 @@ export default function PoliPage() {
         <PatientDataTable
           data={patients}
           onDataChange={handleDataChange}
-          sheetName={selectedMonth} // Pass chosen month
+          sheetName={`${selectedMonth} ${selectedYear}`} // Pass chosen month + year
           poliType={poliType} // Pass chosen poli
         />
       )}

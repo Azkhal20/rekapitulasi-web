@@ -21,12 +21,29 @@ import { patientService, PoliType } from "@/services/patientService";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [selectedPoli, setSelectedPoli] = useState<PoliType>("umum");
   const [statsData, setStatsData] = useState({
     totalPatients: 0,
     todayPatients: 0,
     todayGender: { L: 0, P: 0 },
   });
+
+  // Load selected poli from localStorage saat mount
+  useEffect(() => {
+    const savedPoli = localStorage.getItem("dashboard_selected_poli");
+    if (savedPoli && (savedPoli === "umum" || savedPoli === "gigi")) {
+      setSelectedPoli(savedPoli as PoliType);
+    }
+    setIsStorageLoaded(true);
+  }, []);
+
+  // Save selected poli ke localStorage setiap kali berubah
+  useEffect(() => {
+    if (isStorageLoaded) {
+      localStorage.setItem("dashboard_selected_poli", selectedPoli);
+    }
+  }, [selectedPoli, isStorageLoaded]);
 
   // Helper: Check if cell is filled (truthy, not empty string, not dash)
   const isFilled = (val: unknown) => {
@@ -39,7 +56,8 @@ export default function DashboardPage() {
   const getCurrentMonthName = () => {
     const date = new Date();
     const month = date.toLocaleDateString("id-ID", { month: "long" });
-    return month.toUpperCase();
+    const year = date.getFullYear();
+    return `${month.toUpperCase()} ${year}`;
   };
 
   const currentMonthName = getCurrentMonthName();
@@ -160,8 +178,11 @@ export default function DashboardPage() {
   }, [selectedPoli, currentMonthName]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    // Hanya fetch data setelah localStorage selesai di-load
+    if (isStorageLoaded) {
+      fetchStats();
+    }
+  }, [fetchStats, isStorageLoaded]);
 
   const stats = [
     {
@@ -498,7 +519,7 @@ export default function DashboardPage() {
                   color="#94A3B8"
                   sx={{ fontStyle: "italic" }}
                 >
-                  Fitur Lanjutan Segera Hadir
+                  Fitur Lainnya Segera Hadir
                 </Typography>
               </Box>
             </Box>
@@ -550,7 +571,7 @@ export default function DashboardPage() {
               border: "1px solid #E2E8F0",
             }}
           >
-            <Typography variant="body2" fontWeight="700" color="#475569">
+            <Typography variant="body2" fontWeight="700" color="primary">
               Waktu Server
             </Typography>
             <Typography variant="caption" color="#64748B">

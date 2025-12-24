@@ -13,13 +13,18 @@ import {
   Theme,
   styled,
   Typography,
+  Collapse,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
-import MedicalServicesIcon from "@mui/icons-material/MedicalServices"; // Import added
+import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
+import SummarizeIcon from "@mui/icons-material/Summarize";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import { Box } from "@mui/material";
+import { useState } from "react";
 
 const openedMixin = (theme: Theme, drawerWidth: number): CSSObject => ({
   width: drawerWidth,
@@ -46,8 +51,8 @@ const DrawerHeader = styled("div")(({ theme }) => ({
   display: "flex",
   alignItems: "center",
   padding: theme.spacing(2, 2.5),
-  justifyContent: "flex-start", // Left align
-  minHeight: 80, // Taller header to accommodate 2 lines
+  justifyContent: "flex-start",
+  minHeight: 80,
 }));
 
 const StyledDrawer = styled(MuiDrawer, {
@@ -77,14 +82,25 @@ const menuItems = [
         href: "/dashboard",
       },
       {
-        text: "Poli Umum",
-        icon: <PeopleIcon />,
-        href: "/dashboard/poli/umum",
+        text: "Data Pasien",
+        icon: <LocalHospitalIcon />,
+        children: [
+          {
+            text: "Poli Umum",
+            icon: <PeopleIcon />,
+            href: "/dashboard/poli/umum",
+          },
+          {
+            text: "Poli Gigi",
+            icon: <MedicalServicesIcon />,
+            href: "/dashboard/poli/gigi",
+          },
+        ],
       },
       {
-        text: "Poli Gigi",
-        icon: <MedicalServicesIcon />,
-        href: "/dashboard/poli/gigi",
+        text: "Laporan Periodik",
+        icon: <SummarizeIcon />,
+        href: "/dashboard/reports",
       },
     ],
   },
@@ -97,9 +113,17 @@ interface SidebarProps {
 
 export default function Sidebar({ open, drawerWidth }: SidebarProps) {
   const pathname = usePathname();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    "Data Pasien": true,
+  });
+
+  const handleGroupClick = (text: string) => {
+    setOpenGroups((prev) => ({ ...prev, [text]: !prev[text] }));
+  };
 
   return (
     <StyledDrawer variant="permanent" open={open} drawerWidth={drawerWidth}>
+      {/* ... (kode DrawerHeader tidak berubah) */}
       <DrawerHeader>
         <LocalHospitalIcon
           sx={{ color: "#696CFF", fontSize: 36, mr: 1.5, flexShrink: 0 }}
@@ -157,6 +181,112 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
               </Typography>
             )}
             {section.items.map((item) => {
+              // Menu dengan dropdown
+              if (item.children) {
+                const isOpen = openGroups[item.text];
+                const isChildActive = item.children.some(
+                  (child) => pathname === child.href
+                );
+
+                return (
+                  <Box key={item.text}>
+                    <ListItem disablePadding sx={{ display: "block", mb: 0.5 }}>
+                      <ListItemButton
+                        onClick={() => handleGroupClick(item.text)}
+                        sx={{
+                          minHeight: 44,
+                          justifyContent: open ? "initial" : "center",
+                          px: 2.5,
+                          borderRadius: 2,
+                          color: isChildActive
+                            ? "primary.main"
+                            : "text.primary",
+                          backgroundColor:
+                            isChildActive && !isOpen
+                              ? "rgba(105, 108, 255, 0.08)"
+                              : "transparent",
+                          "&:hover": {
+                            backgroundColor: "rgba(69, 75, 87, 0.04)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 0,
+                            mr: open ? 2 : "auto",
+                            justifyContent: "center",
+                            color: isChildActive ? "inherit" : "#566a7f",
+                          }}
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={item.text}
+                          primaryTypographyProps={{
+                            fontSize: "0.9375rem",
+                            fontWeight: isChildActive ? 600 : 400,
+                          }}
+                          sx={{ opacity: open ? 1 : 0 }}
+                        />
+                        {open && (isOpen ? <ExpandLess /> : <ExpandMore />)}
+                      </ListItemButton>
+                    </ListItem>
+
+                    <Collapse in={isOpen && open} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {item.children.map((child) => {
+                          const isActive = pathname === child.href;
+                          return (
+                            <ListItemButton
+                              key={child.text}
+                              component={Link}
+                              href={child.href}
+                              sx={{
+                                minHeight: 40,
+                                pl: open ? 4 : 2.5,
+                                justifyContent: open ? "initial" : "center",
+                                borderRadius: 2,
+                                mb: 0.5,
+                                color: isActive
+                                  ? "primary.main"
+                                  : "text.secondary",
+                                backgroundColor: isActive
+                                  ? "rgba(105, 108, 255, 0.16) !important"
+                                  : "transparent",
+                                "&:hover": {
+                                  backgroundColor: "rgba(69, 75, 87, 0.04)",
+                                },
+                              }}
+                            >
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: 0,
+                                  mr: open ? 2 : "auto",
+                                  justifyContent: "center",
+                                  color: isActive ? "inherit" : "#566a7f",
+                                  display: open ? "flex" : "none",
+                                }}
+                              >
+                                {child.icon}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={child.text}
+                                primaryTypographyProps={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: isActive ? 600 : 400,
+                                }}
+                                sx={{ opacity: open ? 1 : 0 }}
+                              />
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  </Box>
+                );
+              }
+
+              // Menu link biasa
               const isActive = pathname === item.href;
               return (
                 <ListItem
@@ -166,13 +296,13 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                 >
                   <ListItemButton
                     component={Link}
-                    href={item.href}
+                    href={item.href || "#"}
                     selected={isActive}
                     sx={{
                       minHeight: 44,
                       justifyContent: open ? "initial" : "center",
                       px: 2.5,
-                      borderRadius: 2, // Rounded corners like Sneat
+                      borderRadius: 2,
                       color: isActive ? "primary.main" : "text.primary",
                       backgroundColor: isActive
                         ? "rgba(105, 108, 255, 0.16) !important"
