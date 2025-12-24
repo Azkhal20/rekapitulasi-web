@@ -24,9 +24,8 @@ import ManIcon from "@mui/icons-material/Man";
 import WomanIcon from "@mui/icons-material/Woman";
 import { patientService, PoliType } from "@/services/patientService";
 
+// Custom Order
 const MONTHS = [
-  "NOVEMBER",
-  "DESEMBER",
   "JANUARI",
   "FEBRUARI",
   "MARET",
@@ -37,7 +36,11 @@ const MONTHS = [
   "AGUSTUS",
   "SEPTEMBER",
   "OKTOBER",
+  "NOVEMBER",
+  "DESEMBER",
 ];
+
+const YEARS = ["2025", "2026", "2027", "2028"];
 
 // Helper to get current month name in Uppercase Indonesia
 const getCurrentMonthName = () => {
@@ -55,6 +58,9 @@ export default function TopDiagnosisChart({
 }: TopDiagnosisChartProps) {
   // Default to current month dynamically
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName());
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString()
+  );
 
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<{ name: string; count: number }[]>(
@@ -84,9 +90,10 @@ export default function TopDiagnosisChart({
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch ALL data for the month
+        // Fetch ALL data for the month + year
+        const sheetName = `${selectedMonth} ${selectedYear}`;
         const patients = await patientService.getAllPatients(
-          selectedMonth,
+          sheetName,
           poliType
         );
 
@@ -128,7 +135,7 @@ export default function TopDiagnosisChart({
     };
 
     fetchData();
-  }, [selectedMonth, poliType]);
+  }, [selectedMonth, selectedYear, poliType]);
 
   // Custom Tooltip for Bar Chart
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,34 +189,62 @@ export default function TopDiagnosisChart({
             color="text.secondary"
             sx={{ fontWeight: 500 }}
           >
-            Statistik Poli {poliType.toUpperCase()} — {selectedMonth}
+            Statistik Poli {poliType.toUpperCase()} — {selectedMonth}{" "}
+            {selectedYear}
           </Typography>
         </Box>
 
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <Select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            sx={{
-              borderRadius: "10px",
-              bgcolor: "#F1F5F9",
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: "#E2E8F0",
-              },
-              fontWeight: 600,
-              fontSize: "0.875rem",
-              "&:hover .MuiOutlinedInput-notchedOutline": {
-                borderColor: "primary.main",
-              },
-            }}
-          >
-            {MONTHS.map((month) => (
-              <MenuItem key={month} value={month} sx={{ fontWeight: 500 }}>
-                {month}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Box display="flex" gap={2}>
+          <FormControl size="small" sx={{ minWidth: 100 }}>
+            <Select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              sx={{
+                borderRadius: "10px",
+                bgcolor: "#F1F5F9",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#E2E8F0",
+                },
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "primary.main",
+                },
+              }}
+            >
+              {YEARS.map((year) => (
+                <MenuItem key={year} value={year} sx={{ fontWeight: 500 }}>
+                  {year}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <Select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              sx={{
+                borderRadius: "10px",
+                bgcolor: "#F1F5F9",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#E2E8F0",
+                },
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "primary.main",
+                },
+              }}
+            >
+              {MONTHS.map((month) => (
+                <MenuItem key={month} value={month} sx={{ fontWeight: 500 }}>
+                  {month}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       {loading ? (
@@ -330,7 +365,7 @@ export default function TopDiagnosisChart({
             >
               {/* Laki-laki Progress Group */}
               <Box>
-                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
                   <Box display="flex" alignItems="center" gap={1.5}>
                     <Box
                       sx={{
@@ -382,7 +417,7 @@ export default function TopDiagnosisChart({
 
               {/* Perempuan Progress Group */}
               <Box>
-                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
                   <Box display="flex" alignItems="center" gap={1.5}>
                     <Box
                       sx={{
@@ -402,7 +437,7 @@ export default function TopDiagnosisChart({
                       Perempuan
                     </Typography>
                   </Box>
-                  <Typography variant="body2" fontWeight="800" color="#EC4899">
+                  <Typography variant="body2"  fontWeight="800" color="#EC4899">
                     {genderStats.P}
                   </Typography>
                 </Box>

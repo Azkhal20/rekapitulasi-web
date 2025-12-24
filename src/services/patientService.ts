@@ -56,7 +56,7 @@ class PatientService {
     }
   }
 
-  // GET ALL
+  // AMBIL SEMUA DATA
   async getAllPatients(sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData[]> {
     try {
       const baseUrl = this.getBaseUrl(poli);
@@ -76,7 +76,7 @@ class PatientService {
     }
   }
 
-  // GET BY ID
+  // AMBIL DATA BERDASARKAN ID
   async getPatientById(id: number, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData> {
     try {
       const baseUrl = this.getBaseUrl(poli);
@@ -96,7 +96,7 @@ class PatientService {
     }
   }
 
-  // ADD
+  // TAMBAH PASIEN
   async addPatient(patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
       const baseUrl = this.getBaseUrl(poli);
@@ -125,7 +125,7 @@ class PatientService {
     }
   }
 
-  // UPDATE
+  // UPDATE PASIEN
   async updatePatient(id: number, patientData: Omit<PatientData, 'id'>, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
       const baseUrl = this.getBaseUrl(poli);
@@ -158,7 +158,7 @@ class PatientService {
     }
   }
 
-  // DELETE
+  // HAPUS PASIEN
   async deletePatient(id: number, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
       const baseUrl = this.getBaseUrl(poli);

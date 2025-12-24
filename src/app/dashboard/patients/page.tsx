@@ -17,10 +17,7 @@ import PatientDataTable from "@/components/PatientDataTable";
 import { patientService } from "@/services/patientService"; // Use Service instead of lib
 import { PatientData } from "@/services/patientService";
 
-// Custom Order as requested: Starting from NOVEMBER
 const MONTHS = [
-  "NOVEMBER",
-  "DESEMBER",
   "JANUARI",
   "FEBRUARI",
   "MARET",
@@ -31,20 +28,36 @@ const MONTHS = [
   "AGUSTUS",
   "SEPTEMBER",
   "OKTOBER",
+  "NOVEMBER",
+  "DESEMBER",
 ];
+
+const YEARS = ["2025", "2026", "2027", "2028"];
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Initialize from localStorage or default
-  const [selectedMonth, setSelectedMonth] = useState<string>("NOVEMBER");
 
-  // Effect to load saved month on mount
+  // Default to current month/year dynamically
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    return new Date()
+      .toLocaleDateString("id-ID", { month: "long" })
+      .toUpperCase();
+  });
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    return new Date().getFullYear().toString();
+  });
+
+  // Effect to load saved month/year on mount, ONLY if they exist
   useEffect(() => {
     const savedMonth = localStorage.getItem("selectedMonthPatients");
     if (savedMonth && MONTHS.includes(savedMonth)) {
       setSelectedMonth(savedMonth);
+    }
+    const savedYear = localStorage.getItem("selectedYearPatients");
+    if (savedYear && YEARS.includes(savedYear)) {
+      setSelectedYear(savedYear);
     }
   }, []);
 
@@ -54,12 +67,19 @@ export default function PatientsPage() {
     localStorage.setItem("selectedMonthPatients", newMonth);
   };
 
+  const handleYearChange = (e: SelectChangeEvent<string>) => {
+    const newYear = e.target.value;
+    setSelectedYear(newYear);
+    localStorage.setItem("selectedYearPatients", newYear);
+  };
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       // Fetch using the monthly-aware service (Default to 'umum' for legacy page)
-      const data = await patientService.getAllPatients(selectedMonth, "umum");
+      const sheetName = `${selectedMonth} ${selectedYear}`;
+      const data = await patientService.getAllPatients(sheetName, "umum");
       setPatients(data);
     } catch (err) {
       console.error("Error loading patient data:", err);
@@ -71,7 +91,7 @@ export default function PatientsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, selectedYear]);
 
   // Reload when month changes
   useEffect(() => {
@@ -99,30 +119,49 @@ export default function PatientsPage() {
             fontWeight="bold"
             sx={{ color: "#111827" }}
           >
-            Data Pasien - Bulan {selectedMonth}
+            Data Pasien - {selectedMonth} {selectedYear}
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Total: {patients.length} pasien terdaftar pada bulan ini
           </Typography>
         </Box>
 
-        {/* Month Selector */}
-        <Paper sx={{ p: 1, borderRadius: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Pilih Bulan</InputLabel>
-            <Select
-              value={selectedMonth}
-              label="Pilih Bulan"
-              onChange={handleMonthChange}
-            >
-              {MONTHS.map((month) => (
-                <MenuItem key={month} value={month}>
-                  {month}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Paper>
+        {/* Filter Selectors */}
+        <Box display="flex" gap={2}>
+          <Paper sx={{ p: 1, borderRadius: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 100 }}>
+              <InputLabel>Tahun</InputLabel>
+              <Select
+                value={selectedYear}
+                label="Tahun"
+                onChange={handleYearChange}
+              >
+                {YEARS.map((year) => (
+                  <MenuItem key={year} value={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Paper>
+
+          <Paper sx={{ p: 1, borderRadius: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Pilih Bulan</InputLabel>
+              <Select
+                value={selectedMonth}
+                label="Pilih Bulan"
+                onChange={handleMonthChange}
+              >
+                {MONTHS.map((month) => (
+                  <MenuItem key={month} value={month}>
+                    {month}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Paper>
+        </Box>
       </Box>
 
       {loading ? (
@@ -167,7 +206,7 @@ export default function PatientsPage() {
         <PatientDataTable
           data={patients}
           onDataChange={handleDataChange}
-          sheetName={selectedMonth}
+          sheetName={`${selectedMonth} ${selectedYear}`}
           poliType="umum"
         />
       )}

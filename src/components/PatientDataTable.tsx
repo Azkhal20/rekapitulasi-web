@@ -43,7 +43,7 @@ import withReactContent from "sweetalert2-react-content";
 
 const MySwal = withReactContent(Swal);
 
-// Setup SweetAlert2 Toast
+// Konfigurasi SweetAlert2 Toast
 const Toast = MySwal.mixin({
   toast: true,
   position: "center",
@@ -56,7 +56,7 @@ const Toast = MySwal.mixin({
   },
 });
 
-// Columns that should NOT be sortable
+// Kolom yang TIDAK bisa diurutkan
 const NON_SORTABLE_COLUMNS = [
   "NAMA",
   "NIP",
@@ -70,14 +70,17 @@ const NON_SORTABLE_COLUMNS = [
   "OBAT",
 ];
 
+// Kolom yang diizinkan untuk difilter
+const FILTER_WHITELIST = ["DIAGNOSIS", "ICD-10", "TINDAKAN", "OBAT", "TANGGAL"];
+
 interface PatientDataTableProps {
-  data: Patient[] | PatientData[]; // Support both types
+  data: Patient[] | PatientData[]; // Mendukung kedua tipe
   onDataChange?: () => void;
-  sheetName: string; // REQUIRED: To know which monthly sheet to edit
-  poliType: PoliType; // NEW: To know which clinic API to call
+  sheetName: string; // Untuk tahu sheet bulan apa yang diedit
+  poliType: PoliType; // Untuk tahu API poli mana yang dipanggil
 }
 
-// Type Guard or Helper to access properties safely
+// Fungsi bantu untuk akses properti dengan aman
 function getRowValue(
   row: Patient | PatientData,
   column: string
@@ -91,7 +94,7 @@ export default function PatientDataTable({
   sheetName,
   poliType,
 }: PatientDataTableProps) {
-  // Existing table state
+  // State tabel
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,7 +103,7 @@ export default function PatientDataTable({
   const [filterColumn, setFilterColumn] = useState<string>("");
   const [filterValue, setFilterValue] = useState<string>("");
 
-  // CRUD state
+  // State CRUD (Tambah/Edit)
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(
@@ -109,16 +112,16 @@ export default function PatientDataTable({
 
   const [nextTahun, setNextTahun] = useState<string>("1");
 
-  // Get column names from first data row
+  // Ambil nama kolom dari baris data pertama
   const columns = useMemo(() => {
     if (data.length === 0) return [];
     return Object.keys(data[0]).filter((key) => key !== "id");
   }, [data]);
 
-  // Fallback columns if data is empty (to show headers)
+  // Kolom default jika data kosong (untuk menampilkan header)
   const effectiveColumns = useMemo(() => {
     if (columns.length > 0) return columns;
-    // Default headers order matching the Form/Sheet typically
+    // Default urutan header sesuai Google Sheet
     return [
       "TANGGAL",
       "HARI",
@@ -139,20 +142,14 @@ export default function PatientDataTable({
     ];
   }, [columns]);
 
-  // Helper to format date
-  // FIX INVALID DATE ISSUE
   const formatDate = (dateString: string) => {
     try {
       if (!dateString) return "-";
-      // If it already looks like "16 Des 2025" (contains letters), just return it
-      // Simple regex to check for alphabetical characters
       if (/[a-zA-Z]/.test(dateString)) return dateString;
 
       const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) return dateString; // Return original if parsing fails
+      if (isNaN(date.getTime())) return dateString;
 
-      // Format: 15 Nov 2025
       return date.toLocaleDateString("id-ID", {
         day: "numeric",
         month: "short",
@@ -163,19 +160,94 @@ export default function PatientDataTable({
     }
   };
 
-  // Get unique values for a column (for filter dropdown)
-  const getUniqueValues = (column: string) => {
-    const values = data
-      .map((row) => String(getRowValue(row, column) || ""))
-      .filter(Boolean);
-    return Array.from(new Set(values)).sort();
+  // Parsing tanggal Indonesia (DD-MM-YYYY atau DD Bulan YYYY)
+  const parseLocalDate = (dateStr: string): Date => {
+    if (!dateStr || dateStr === "-" || dateStr === "") return new Date(0);
+
+    const cleanStr = dateStr.trim();
+
+    const d = new Date(cleanStr);
+    if (!isNaN(d.getTime())) return d;
+
+    const parts = cleanStr.split(/[\s-/]+/);
+
+    if (parts.length >= 3) {
+      let day: number, monthIndex: number | undefined, year: number;
+
+      if (parts[0].length === 4 && !isNaN(parseInt(parts[0]))) {
+        year = parseInt(parts[0]);
+        monthIndex = parseInt(parts[1]) - 1;
+        day = parseInt(parts[2]);
+      } else {
+        day = parseInt(parts[0]);
+        const monthRaw = parts[1].toLowerCase();
+        year = parseInt(parts[2]);
+
+        if (!isNaN(parseInt(monthRaw))) {
+          monthIndex = parseInt(monthRaw) - 1;
+        } else {
+          const monthsID: Record<string, number> = {
+            januari: 0,
+            februari: 1,
+            maret: 2,
+            april: 3,
+            mei: 4,
+            juni: 5,
+            juli: 6,
+            agustus: 7,
+            september: 8,
+            oktober: 9,
+            november: 10,
+            desember: 11,
+            jan: 0,
+            feb: 1,
+            mar: 2,
+            apr: 3,
+            jun: 5,
+            jul: 6,
+            ags: 7,
+            sep: 8,
+            okt: 9,
+            nov: 10,
+            des: 11,
+          };
+          monthIndex = monthsID[monthRaw];
+        }
+      }
+
+      if (monthIndex !== undefined && !isNaN(day) && !isNaN(year)) {
+        return new Date(year, monthIndex, day);
+      }
+    }
+
+    return new Date(0);
   };
 
-  // Filter and sort data
+  const getUniqueValues = (column: string) => {
+    let values = data
+      .map((row) => String(getRowValue(row, column) || ""))
+      .filter(Boolean);
+
+    values = Array.from(new Set(values));
+
+    if (column === "TANGGAL") {
+      return values.sort((a, b) => {
+        const dateA = parseLocalDate(a);
+        const dateB = parseLocalDate(b);
+        return dateA.getTime() - dateB.getTime();
+      });
+    }
+
+    return values.sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  };
+
+  // Filtering dan sorting data
   const filteredAndSortedData = useMemo(() => {
     let result = [...data];
 
-    // Apply search filter
+    // Filter Pencarian
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter((row) =>
@@ -185,31 +257,55 @@ export default function PatientDataTable({
       );
     }
 
-    // Apply column filter
+    // Filter Kolom
     if (filterColumn && filterValue) {
       result = result.filter(
         (row) => String(getRowValue(row, filterColumn)) === filterValue
       );
     }
 
-    // Apply sorting
+    // Logika Pengurutan
     if (sortColumn) {
       result.sort((a, b) => {
-        const aValue = String(getRowValue(a, sortColumn) || "");
-        const bValue = String(getRowValue(b, sortColumn) || "");
+        const aValRaw = getRowValue(a, sortColumn);
+        const bValRaw = getRowValue(b, sortColumn);
 
-        if (sortDirection === "asc") {
-          return aValue.localeCompare(bValue);
-        } else {
-          return bValue.localeCompare(aValue);
+        const aValue = String(aValRaw || "");
+        const bValue = String(bValRaw || "");
+
+        let comparison = 0;
+
+        // Pengurutan Tanggal Khusus
+        if (sortColumn === "TANGGAL") {
+          const dateA = parseLocalDate(aValue);
+          const dateB = parseLocalDate(bValue);
+          comparison = dateA.getTime() - dateB.getTime();
         }
+        // Pengurutan Angka (misal USIA, NO)
+        else {
+          // Cek apakah keduanya angka murni
+          const numA = parseFloat(aValue);
+          const numB = parseFloat(bValue);
+
+          if (!isNaN(numA) && !isNaN(numB)) {
+            comparison = numA - numB;
+          } else {
+            // Sort string dengan 'numeric aware' (menangani "1" atau "01", "2" atau "10")
+            comparison = aValue.localeCompare(bValue, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+          }
+        }
+
+        return sortDirection === "asc" ? comparison : -comparison;
       });
     }
 
     return result;
   }, [data, searchQuery, filterColumn, filterValue, sortColumn, sortDirection]);
 
-  // Paginate data
+  // Pagination Data
   const paginatedData = useMemo(() => {
     const start = page * rowsPerPage;
     return filteredAndSortedData.slice(start, start + rowsPerPage);
@@ -248,12 +344,12 @@ export default function PatientDataTable({
     setPage(0);
   };
 
-  // CRUD Handlers
+  // Handler CRUD
   const handleAddPatient = () => {
-    // LOGIC: Get Last Row's TAHUN + 1
+    // LOGIKA: Ambil nomor urut terakhir + 1
     let nextNum = "1";
     if (data.length > 0) {
-      // Sort by ID descending to get the latest entry added
+      // Sort berdasarkan ID descending untuk dapat entry terakhir
       const sorted = [...data].sort((a, b) => {
         const idA = Number((a as Record<string, unknown>).id) || 0;
         const idB = Number((b as Record<string, unknown>).id) || 0;
@@ -283,7 +379,7 @@ export default function PatientDataTable({
 
     const p = patient as Record<string, unknown>;
 
-    // MAPPING FIX: Sesuaikan dengan Key dari Google Sheet JSON
+    // PERBAIKAN MAPPING: Sesuaikan dengan Key dari Google Sheet JSON
     const patientData: PatientData = {
       id: p.id as number,
       TANGGAL: String(p.TANGGAL || ""),
@@ -301,7 +397,7 @@ export default function PatientDataTable({
       OBS_TTV: String(p["OBS TTV"] || p.OBS_TTV || ""),
       KELUHAN: String(p.KELUHAN || ""),
       DIAGNOSIS: String(p.DIAGNOSIS || ""),
-      // Robust key mapping for ICD-10 and TINDAKAN
+      // Mapping robust untuk ICD-10 dan TINDAKAN
       ICD10: String(p["ICD-10"] || p["ICD 10"] || p.ICD10 || ""),
       TINDAKAN: String(p["TINDAKAN"] || p["TINDAKAN "] || p.TINDAKAN || ""),
       OBAT: String(p.OBAT || ""),
@@ -337,7 +433,7 @@ export default function PatientDataTable({
             },
           });
 
-          // PASS SHEET NAME TO SERVICE
+          // KIRIM NAMA SHEET KE SERVICE
           await patientService.deletePatient(
             p.id as number,
             sheetName,
@@ -380,11 +476,11 @@ export default function PatientDataTable({
         },
       });
 
-      // MAPPING FIX FOR WRITE OPERATIONS
-      // Google Sheets backend V5 expects Header names as keys (e.g., "OBS TTV", not "OBS_TTV")
-      const payload: Record<string, unknown> = { ...formData };
+      // PERBAIKAN MAPPING UNTUK OPERASI TULIS (WRITE)
+      // Google Sheets backend V5 membutuhkan nama Header sebagai key (e.g., "OBS TTV", bukan "OBS_TTV")
+      const payload: Record<string, unknown> = { ...formData }; // Copy data
 
-      // Remap internal keys to Google Sheet keys
+      // Remap key internal ke key Google Sheet
       if (formData.OBS_TTV) {
         payload["OBS TTV"] = formData.OBS_TTV;
         delete payload.OBS_TTV;
@@ -398,7 +494,7 @@ export default function PatientDataTable({
         delete payload.ENAM_BELAS_LIMA_BELAS;
       }
 
-      // Let's force-add these keys to payload just in case
+      // Pastikan key ini ada di payload untuk keamanan
       payload["OBS TTV"] = formData.OBS_TTV || "";
       payload["ICD-10"] = formData.ICD10 || "";
       payload["16-15"] = formData.ENAM_BELAS_LIMA_BELAS || "";
@@ -406,7 +502,7 @@ export default function PatientDataTable({
       payload["TINDAKAN "] = formData.TINDAKAN || "";
 
       if (formMode === "add") {
-        // PASS SHEET NAME TO SERVICE
+        // KIRIM NAMA SHEET KE SERVICE
         await patientService.addPatient(
           payload as unknown as Omit<PatientData, "id">,
           sheetName,
@@ -419,13 +515,13 @@ export default function PatientDataTable({
             icon: "success",
             title: "Data pasien berhasil ditambahkan",
           }).then(() => {
-            // Force Reload to ensure fresh data for auto-increment logic
+            // Paksa Reload untuk memastikan data fresh untuk logika auto-increment
             window.location.reload();
           });
         }, 300);
       } else {
         if (selectedPatient?.id) {
-          // PASS SHEET NAME TO SERVICE
+          // KIRIM NAMA SHEET KE SERVICE
           await patientService.updatePatient(
             selectedPatient.id,
             payload as unknown as Omit<PatientData, "id">,
@@ -438,7 +534,7 @@ export default function PatientDataTable({
               icon: "success",
               title: "Data pasien berhasil diperbarui",
             }).then(() => {
-              // Force Reload
+              // Paksa Reload
               window.location.reload();
             });
           }, 300);
@@ -447,7 +543,7 @@ export default function PatientDataTable({
 
       setFormDialogOpen(false);
       setSelectedPatient(null);
-      // onDataChange call is now redundant if we reload, but kept for safety if reload removed later
+      // onDataChange redundant jika reload, tapi disimpan untuk keamanan
       if (onDataChange) {
         onDataChange();
       }
@@ -535,10 +631,11 @@ export default function PatientDataTable({
           />
 
           <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 200 } }}>
-            <InputLabel>Filter Kolom</InputLabel>
+            <InputLabel id="filter-column-label">Filter Berdasarkan</InputLabel>
             <Select
+              labelId="filter-column-label"
               value={filterColumn}
-              label="Filter Kolom"
+              label="Filter Berdasarkan"
               onChange={(e) => {
                 setFilterColumn(e.target.value);
                 setFilterValue("");
@@ -546,18 +643,27 @@ export default function PatientDataTable({
               }}
               startAdornment={
                 <InputAdornment position="start">
-                  <FilterListIcon fontSize="small" />
+                  <FilterListIcon
+                    fontSize="small"
+                    sx={{ color: "primary.main" }}
+                  />
                 </InputAdornment>
               }
+              sx={{
+                borderRadius: "10px",
+                "& fieldset": { borderColor: "#E0E0E0" },
+              }}
             >
               <MenuItem value="">
-                <strong>Tidak ada</strong>
+                <em>Tidak ada</em>
               </MenuItem>
-              {effectiveColumns.map((col) => (
-                <MenuItem key={col} value={col}>
-                  {col}
-                </MenuItem>
-              ))}
+              {effectiveColumns
+                .filter((col) => FILTER_WHITELIST.includes(col))
+                .map((col) => (
+                  <MenuItem key={col} value={col}>
+                    {col}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
 
@@ -567,17 +673,22 @@ export default function PatientDataTable({
               size="small"
               sx={{ minWidth: { xs: "100%", md: 200 } }}
             >
-              <InputLabel>Nilai Filter</InputLabel>
+              <InputLabel id="filter-value-label">Pilih Nilai</InputLabel>
               <Select
+                labelId="filter-value-label"
                 value={filterValue}
-                label="Nilai Filter"
+                label="Pilih Nilai"
                 onChange={(e) => {
                   setFilterValue(e.target.value);
                   setPage(0);
                 }}
+                sx={{
+                  borderRadius: "10px",
+                  "& fieldset": { borderColor: "#E0E0E0" },
+                }}
               >
                 <MenuItem value="">
-                  <strong>Semua</strong>
+                  <em>Semua</em>
                 </MenuItem>
                 {getUniqueValues(filterColumn).map((value) => (
                   <MenuItem key={value} value={value}>
@@ -654,7 +765,7 @@ export default function PatientDataTable({
                     fontWeight: 700,
                     color: "black",
                     py: 2,
-                    backgroundColor: "#F8FAFB", // Updated Color
+                    backgroundColor: "#F1F5F9", // Updated Color
                   }}
                 >
                   NO
@@ -671,7 +782,7 @@ export default function PatientDataTable({
                         color: "black",
                         whiteSpace: "nowrap",
                         py: 2,
-                        backgroundColor: "#F8FAFB", // Updated Color
+                        backgroundColor: "#F1F5F9", // Updated Color
                       }}
                     >
                       {isSortable ? (
@@ -712,7 +823,7 @@ export default function PatientDataTable({
                     fontWeight: 700,
                     color: "black",
                     py: 2,
-                    backgroundColor: "#F8FAFB", // Updated Color
+                    backgroundColor: "#F1F5F9", // Updated Color
                   }}
                 >
                   AKSI
