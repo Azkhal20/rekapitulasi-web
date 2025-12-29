@@ -192,22 +192,13 @@ const getPatientValue = (row: PatientData, key: string): string => {
 };
 
 export default function ReportsPage() {
-  // Load dari localStorage atau default ke "umum"
-  const [selectedPoli, setSelectedPoli] = useState<PoliType>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("reports_selected_poli");
-      if (saved && (saved === "umum" || saved === "gigi")) {
-        return saved as PoliType;
-      }
-    }
-    return "umum";
-  });
-
+  const [selectedPoli, setSelectedPoli] = useState<PoliType>("umum");
   const [periods] = useState<PeriodOption[]>(generatePeriods());
   const [selectedPeriodLabel, setSelectedPeriodLabel] = useState<string>("");
 
   const [reportData, setReportData] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false); // Flag untuk mencegah hydration mismatch
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
@@ -224,15 +215,16 @@ export default function ReportsPage() {
     setPage(0);
   };
 
-  // Save selectedPoli ke localStorage
+  // Load selected poli dan period dari localStorage atau set default saat mount
   useEffect(() => {
-    localStorage.setItem("reports_selected_poli", selectedPoli);
-  }, [selectedPoli]);
+    // 1. Load Poli
+    const savedPoli = localStorage.getItem("reports_selected_poli");
+    if (savedPoli && (savedPoli === "umum" || savedPoli === "gigi")) {
+      setSelectedPoli(savedPoli as PoliType);
+    }
 
-  // Load selected period dari localStorage atau set default
-  useEffect(() => {
+    // 2. Load Periode
     const savedPeriod = localStorage.getItem("reports_selected_period");
-
     if (savedPeriod && periods.find((p) => p.label === savedPeriod)) {
       setSelectedPeriodLabel(savedPeriod);
     } else {
@@ -246,17 +238,25 @@ export default function ReportsPage() {
         setSelectedPeriodLabel(periods[0].label);
       }
     }
+    setIsLoaded(true);
   }, [periods]);
+
+  // Save selectedPoli ke localStorage
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("reports_selected_poli", selectedPoli);
+    }
+  }, [selectedPoli, isLoaded]);
 
   // Save selected period ke localStorage
   useEffect(() => {
-    if (selectedPeriodLabel) {
+    if (isLoaded && selectedPeriodLabel) {
       localStorage.setItem("reports_selected_period", selectedPeriodLabel);
     }
-  }, [selectedPeriodLabel]);
+  }, [selectedPeriodLabel, isLoaded]);
 
   useEffect(() => {
-    if (!selectedPeriodLabel) return;
+    if (!isLoaded || !selectedPeriodLabel) return;
 
     const period = periods.find((p) => p.label === selectedPeriodLabel);
     if (!period) return;
@@ -337,7 +337,7 @@ export default function ReportsPage() {
     };
 
     fetchData();
-  }, [selectedPeriodLabel, selectedPoli, periods]);
+  }, [selectedPeriodLabel, selectedPoli, periods, isLoaded]);
 
   const [filterDate, setFilterDate] = useState<string>("All");
 
@@ -517,8 +517,97 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
         </Box>
+
+        {/* Card Total L */}
+        <Box flex={1}>
+          <Card
+            sx={{
+              borderRadius: "16px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+              border: "1px solid #E0F2FE",
+              bgcolor: "#F0F9FF",
+              height: "100%",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CardContent>
+              <Typography
+                variant="caption"
+                fontWeight="bold"
+                color="#0369A1"
+                sx={{ textTransform: "uppercase" }}
+              >
+                Laki-laki (L)
+              </Typography>
+              <Typography
+                variant="h3"
+                fontWeight="800"
+                textAlign="center"
+                sx={{
+                  color: "#0284C7",
+                  mt: 1,
+                }}
+              >
+                {loading
+                  ? "..."
+                  : filteredReportData.filter(
+                      (p) =>
+                        p.L &&
+                        String(p.L).trim() !== "" &&
+                        String(p.L).trim() !== "-"
+                    ).length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Card Total P */}
+        <Box flex={1}>
+          <Card
+            sx={{
+              borderRadius: "16px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+              border: "1px solid #FCE7F3",
+              bgcolor: "#FDF2F8",
+              height: "100%",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CardContent>
+              <Typography
+                variant="caption"
+                fontWeight="bold"
+                color="#BE185D"
+                sx={{ textTransform: "uppercase" }}
+              >
+                Perempuan (P)
+              </Typography>
+              <Typography
+                variant="h3"
+                fontWeight="800"
+                textAlign="center"
+                sx={{
+                  color: "#DB2777",
+                  mt: 1,
+                }}
+              >
+                {loading
+                  ? "..."
+                  : filteredReportData.filter(
+                      (p) =>
+                        p.P &&
+                        String(p.P).trim() !== "" &&
+                        String(p.P).trim() !== "-"
+                    ).length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
+
         {activePeriod && (
-          <Box flex={3}>
+          <Box flex={2}>
             <Card
               sx={{
                 height: "100%",
