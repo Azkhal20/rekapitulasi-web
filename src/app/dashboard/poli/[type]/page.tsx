@@ -47,35 +47,48 @@ export default function PoliPage() {
 
   const [patients, setPatients] = useState<PatientData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load dari localStorage atau default ke current month/year
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`poli_${poliType}_month`);
-      if (saved && MONTHS.includes(saved)) return saved;
-    }
-    return new Date()
-      .toLocaleDateString("id-ID", { month: "long" })
-      .toUpperCase();
-  });
+  // Default to empty for SSR
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string>("");
 
-  const [selectedYear, setSelectedYear] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`poli_${poliType}_year`);
-      if (saved && YEARS.includes(saved)) return saved;
+  // Load dari localStorage atau default ke current month/year saat mount
+  useEffect(() => {
+    // 1. Load Month
+    const savedMonth = localStorage.getItem(`poli_${poliType}_month`);
+    if (savedMonth && MONTHS.includes(savedMonth)) {
+      setSelectedMonth(savedMonth);
+    } else {
+      setSelectedMonth(
+        new Date().toLocaleDateString("id-ID", { month: "long" }).toUpperCase()
+      );
     }
-    return new Date().getFullYear().toString();
-  });
+
+    // 2. Load Year
+    const savedYear = localStorage.getItem(`poli_${poliType}_year`);
+    if (savedYear && YEARS.includes(savedYear)) {
+      setSelectedYear(savedYear);
+    } else {
+      setSelectedYear(new Date().getFullYear().toString());
+    }
+
+    setIsStorageLoaded(true);
+  }, [poliType]);
 
   // Save ke localStorage setiap kali month atau year berubah
   useEffect(() => {
-    localStorage.setItem(`poli_${poliType}_month`, selectedMonth);
-  }, [selectedMonth, poliType]);
+    if (isStorageLoaded && selectedMonth) {
+      localStorage.setItem(`poli_${poliType}_month`, selectedMonth);
+    }
+  }, [selectedMonth, poliType, isStorageLoaded]);
 
   useEffect(() => {
-    localStorage.setItem(`poli_${poliType}_year`, selectedYear);
-  }, [selectedYear, poliType]);
+    if (isStorageLoaded && selectedYear) {
+      localStorage.setItem(`poli_${poliType}_year`, selectedYear);
+    }
+  }, [selectedYear, poliType, isStorageLoaded]);
 
   const loadData = useCallback(async () => {
     try {
@@ -94,12 +107,12 @@ export default function PoliPage() {
     }
   }, [selectedMonth, selectedYear, poliType]);
 
-  // Reload when month or poli changes
+  // Reload when month or poli changes (hanya setelah storage di-load)
   useEffect(() => {
-    if (isValidPoli) {
+    if (isValidPoli && isStorageLoaded) {
       loadData();
     }
-  }, [loadData, isValidPoli]);
+  }, [loadData, isValidPoli, isStorageLoaded]);
 
   const handleDataChange = () => {
     loadData();
