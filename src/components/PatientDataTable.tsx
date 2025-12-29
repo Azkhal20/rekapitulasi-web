@@ -243,6 +243,44 @@ export default function PatientDataTable({
     );
   };
 
+  // Fungsi untuk menentukan lebar kolom berdasarkan tipe data
+  const getColumnWidth = (column: string): number | string => {
+    const widthMap: Record<string, number | string> = {
+      // Kolom kecil (angka/short text)
+      TAHUN: 60,
+      BULAN: 100,
+      HARI: 90,
+      "16-15": 70,
+      L: 60,
+      P: 60,
+      USIA: 70,
+
+      // Kolom sedang
+      TANGGAL: 120,
+      NIP: 190,
+      "ICD-10": 80,
+      ICD10: 80,
+
+      // Kolom besar (nama)
+      NAMA: 180,
+
+      // Kolom sangat besar (teks panjang)
+      "OBS TTV": 220,
+      KELUHAN: 300,
+      DIAGNOSIS: 200,
+      TINDAKAN: 220,
+      "TINDAKAN ": 220,
+      OBAT: 220,
+    };
+
+    return widthMap[column] || 150;
+  };
+
+  // Semua kolom menggunakan left alignment
+  const getColumnAlign = (): "left" | "center" | "right" => {
+    return "left";
+  };
+
   // Filtering dan sorting data
   const filteredAndSortedData = useMemo(() => {
     let result = [...data];
@@ -771,18 +809,22 @@ export default function PatientDataTable({
                   NO
                 </TableCell>
                 {effectiveColumns.map((column) => {
-                  // Check if sorting feature should be disabled for this column
                   const isSortable = !NON_SORTABLE_COLUMNS.includes(column);
+                  const columnWidth = getColumnWidth(column);
+                  const columnAlign = getColumnAlign();
 
                   return (
                     <TableCell
                       key={column}
+                      width={columnWidth}
+                      align={columnAlign}
                       sx={{
                         fontWeight: 700,
                         color: "black",
                         whiteSpace: "nowrap",
                         py: 2,
-                        backgroundColor: "#F1F5F9", // Updated Color
+                        backgroundColor: "#F1F5F9",
+                        minWidth: columnWidth,
                       }}
                     >
                       {isSortable ? (
@@ -860,18 +902,40 @@ export default function PatientDataTable({
                       {page * rowsPerPage + index + 1}
                     </TableCell>
                     {effectiveColumns.map((column) => {
-                      // Handle formatting
                       let cellValue = getRowValue(row, column) || "-";
+                      const columnWidth = getColumnWidth(column);
+                      const columnAlign = getColumnAlign();
 
-                      // Format Date for 'TANGGAL' column
                       if (column === "TANGGAL" && cellValue !== "-") {
                         cellValue = formatDate(String(cellValue));
                       }
 
+                      // Kolom dengan teks panjang yang perlu word wrap
+                      const isLongTextColumn = [
+                        "OBS TTV",
+                        "KELUHAN",
+                        "DIAGNOSIS",
+                        "TINDAKAN",
+                        "TINDAKAN ",
+                        "OBAT",
+                        "NAMA",
+                      ].includes(column);
+
                       return (
                         <TableCell
                           key={column}
-                          sx={{ color: "black", py: 1.5 }}
+                          align={columnAlign}
+                          sx={{
+                            color: "black",
+                            py: 1.5,
+                            minWidth: columnWidth,
+                            maxWidth: columnWidth,
+                            whiteSpace: isLongTextColumn ? "normal" : "nowrap",
+                            wordWrap: isLongTextColumn
+                              ? "break-word"
+                              : "normal",
+                            overflow: "hidden",
+                          }}
                         >
                           {String(cellValue)}
                         </TableCell>
