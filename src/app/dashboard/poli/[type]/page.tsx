@@ -50,28 +50,26 @@ export default function PoliPage() {
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Default to empty for SSR
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
-  const [selectedYear, setSelectedYear] = useState<string>("");
+  // State for selected month and year, defaults to current date
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    new Date().toLocaleDateString("id-ID", { month: "long" }).toUpperCase()
+  );
+  const [selectedYear, setSelectedYear] = useState<string>(
+    new Date().getFullYear().toString()
+  );
 
-  // Load dari localStorage atau default ke current month/year saat mount
+  // Mark as loaded immediately since we don't wait for localStorage anymore
   useEffect(() => {
-    // 1. Load Month
-    const savedMonth = localStorage.getItem(`poli_${poliType}_month`);
-    if (savedMonth && MONTHS.includes(savedMonth)) {
-      setSelectedMonth(savedMonth);
-    } else {
-      setSelectedMonth(
-        new Date().toLocaleDateString("id-ID", { month: "long" }).toUpperCase()
-      );
+    // 1. Load Last Selected Month if valid
+    const lastMonth = localStorage.getItem(`poli_${poliType}_month`);
+    if (lastMonth && MONTHS.includes(lastMonth)) {
+      setSelectedMonth(lastMonth);
     }
 
-    // 2. Load Year
-    const savedYear = localStorage.getItem(`poli_${poliType}_year`);
-    if (savedYear && YEARS.includes(savedYear)) {
-      setSelectedYear(savedYear);
-    } else {
-      setSelectedYear(new Date().getFullYear().toString());
+    // 2. Load Last Selected Year if valid
+    const lastYear = localStorage.getItem(`poli_${poliType}_year`);
+    if (lastYear && YEARS.includes(lastYear)) {
+      setSelectedYear(lastYear);
     }
 
     setIsStorageLoaded(true);
