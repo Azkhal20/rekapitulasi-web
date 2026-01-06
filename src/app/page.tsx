@@ -213,11 +213,9 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Glassmorphism Card */}
         <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl border border-white/20 p-8">
-          {/* Logo/Title */}
+          {/* Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-              <span className="text-white text-2xl font-bold">R</span>
-            </div>
+            {/* Logo removed as requested */}
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Rekapitulasi
             </h1>

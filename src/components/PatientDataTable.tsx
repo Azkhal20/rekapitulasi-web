@@ -34,13 +34,12 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import HistoryIcon from "@mui/icons-material/History";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
-import {
-  patientService,
-  PatientData,
-  PoliType,
-} from "@/services/patientService";
+import { PatientData, PoliType } from "@/services/patientService";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
+import { usePatientMutations } from "@/hooks/usePatients";
+import { PatientSchema } from "@/schemas/patientSchema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const MySwal = withReactContent(Swal);
 
@@ -95,6 +94,8 @@ export default function PatientDataTable({
   sheetName,
   poliType,
 }: PatientDataTableProps) {
+  const { canCreate, canEdit, canDelete } = usePermissions();
+
   // State tabel
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -109,6 +110,12 @@ export default function PatientDataTable({
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(
     null
+  );
+
+  // React Query Mutations
+  const { addMutation, updateMutation, deleteMutation } = usePatientMutations(
+    sheetName,
+    poliType
   );
 
   const [nextTahun, setNextTahun] = useState<string>("1");
@@ -520,21 +527,13 @@ export default function PatientDataTable({
             },
           });
 
-          // KIRIM NAMA SHEET KE SERVICE
-          await patientService.deletePatient(
-            p.id as number,
-            sheetName,
-            poliType
-          );
+          await deleteMutation.mutateAsync(p.id as number);
 
           Swal.close();
-
-          setTimeout(() => {
-            Toast.fire({
-              icon: "success",
-              title: "Data pasien berhasil dihapus",
-            });
-          }, 300);
+          Toast.fire({
+            icon: "success",
+            title: "Data pasien berhasil dihapus",
+          });
 
           if (onDataChange) {
             onDataChange();
@@ -542,18 +541,33 @@ export default function PatientDataTable({
         } catch (error) {
           console.error("Error deleting patient:", error);
           Swal.close();
-          setTimeout(() => {
-            Toast.fire({
-              icon: "error",
-              title: "Gagal menghapus data pasien",
-            });
-          }, 300);
+          Toast.fire({
+            icon: "error",
+            title: "Gagal menghapus data pasien",
+          });
         }
       }
     });
   };
 
   const handleFormSubmit = async (formData: Omit<PatientData, "id">) => {
+    // 1. Zod Validation
+    const validationResult = PatientSchema.safeParse(formData);
+
+    if (!validationResult.success) {
+      // Gather error messages
+      const errors = validationResult.error.issues
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join("\n");
+
+      Toast.fire({
+        icon: "error",
+        title: "Validasi Gagal",
+        text: errors || "Cek kembali data inputan Anda.",
+      });
+      return;
+    }
+
     try {
       MySwal.fire({
         title: "Menyimpan...",
@@ -563,11 +577,16 @@ export default function PatientDataTable({
         },
       });
 
-      // PERBAIKAN MAPPING UNTUK OPERASI TULIS (WRITE)
-      // Google Sheets backend V5 membutuhkan nama Header sebagai key (e.g., "OBS TTV", bukan "OBS_TTV")
-      const payload: Record<string, unknown> = { ...formData }; // Copy data
+      // Prepare Payload (similar mapping logic if needed,
+      // though Schema helps ensure structure)
+      // We still need mapping for custom keys like "OBS TTV" if backend requires spaces
+      // BUT Zod schema already has keys defined.
+      // If backend expects "OBS TTV" but frontend uses "OBS_TTV", we need to map.
+      // The current frontend uses "OBS_TTV", Zod uses "OBS_TTV" (optional).
 
-      // Remap key internal ke key Google Sheet
+      // Let's stick to the mapping logic for backend compatibility from the previous code
+      const payload: Record<string, unknown> = { ...formData };
+
       if (formData.OBS_TTV) {
         payload["OBS TTV"] = formData.OBS_TTV;
         delete payload.OBS_TTV;
@@ -581,70 +600,50 @@ export default function PatientDataTable({
         delete payload.ENAM_BELAS_LIMA_BELAS;
       }
 
-      // Pastikan key ini ada di payload untuk keamanan
-      payload["OBS TTV"] = formData.OBS_TTV || "";
-      payload["ICD-10"] = formData.ICD10 || "";
-      payload["16-15"] = formData.ENAM_BELAS_LIMA_BELAS || "";
+      // Safety defaults
+      payload["OBS TTV"] = payload["OBS TTV"] || "";
+      payload["ICD-10"] = payload["ICD-10"] || "";
+      payload["16-15"] = payload["16-15"] || "";
       payload["TINDAKAN"] = formData.TINDAKAN || "";
       payload["TINDAKAN "] = formData.TINDAKAN || "";
 
       if (formMode === "add") {
-        // KIRIM NAMA SHEET KE SERVICE
-        await patientService.addPatient(
-          payload as unknown as Omit<PatientData, "id">,
-          sheetName,
-          poliType
+        await addMutation.mutateAsync(
+          payload as unknown as Omit<PatientData, "id">
         );
 
         Swal.close();
-        setTimeout(() => {
-          Toast.fire({
-            icon: "success",
-            title: "Data pasien berhasil ditambahkan",
-          }).then(() => {
-            // Paksa Reload untuk memastikan data fresh untuk logika auto-increment
-            window.location.reload();
-          });
-        }, 300);
+        Toast.fire({
+          icon: "success",
+          title: "Data pasien berhasil ditambahkan",
+        });
       } else {
         if (selectedPatient?.id) {
-          // KIRIM NAMA SHEET KE SERVICE
-          await patientService.updatePatient(
-            selectedPatient.id,
-            payload as unknown as Omit<PatientData, "id">,
-            sheetName
-          );
+          await updateMutation.mutateAsync({
+            id: selectedPatient.id,
+            data: payload as unknown as Omit<PatientData, "id">,
+          });
 
           Swal.close();
-          setTimeout(() => {
-            Toast.fire({
-              icon: "success",
-              title: "Data pasien berhasil diperbarui",
-            }).then(() => {
-              // Paksa Reload
-              window.location.reload();
-            });
-          }, 300);
+          Toast.fire({
+            icon: "success",
+            title: "Data pasien berhasil diperbarui",
+          });
         }
       }
 
       setFormDialogOpen(false);
       setSelectedPatient(null);
-      // onDataChange redundant jika reload, tapi disimpan untuk keamanan
-      if (onDataChange) {
-        onDataChange();
-      }
+      if (onDataChange) onDataChange();
     } catch (error) {
       Swal.close();
-      setTimeout(() => {
-        Toast.fire({
-          icon: "error",
-          title: `Gagal ${
-            formMode === "add" ? "menambahkan" : "memperbarui"
-          } data pasien`,
-        });
-      }, 300);
-      throw error;
+      Toast.fire({
+        icon: "error",
+        title: `Gagal ${
+          formMode === "add" ? "menambahkan" : "memperbarui"
+        } data pasien`,
+      });
+      console.error(error);
     }
   };
 
@@ -677,23 +676,25 @@ export default function PatientDataTable({
         >
           DATA TERBARU
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleAddPatient}
-          startIcon={
-            <Box component="span" sx={{ fontSize: "1.2em" }}>
-              +
-            </Box>
-          }
-          sx={{
-            backgroundColor: "#696CFF",
-            "&:hover": { backgroundColor: "#5f61e6" },
-            boxShadow: "0 2px 4px 0 rgba(105, 108, 255, 0.4)",
-            px: 3,
-          }}
-        >
-          TAMBAH PASIEN
-        </Button>
+        {canCreate && (
+          <Button
+            variant="contained"
+            onClick={handleAddPatient}
+            startIcon={
+              <Box component="span" sx={{ fontSize: "1.2em" }}>
+                +
+              </Box>
+            }
+            sx={{
+              backgroundColor: "#696CFF",
+              "&:hover": { backgroundColor: "#5f61e6" },
+              boxShadow: "0 2px 4px 0 rgba(105, 108, 255, 0.4)",
+              px: 3,
+            }}
+          >
+            TAMBAH PASIEN
+          </Button>
+        )}
       </Box>
 
       {/* Controls (Search, Filter) */}
@@ -925,25 +926,31 @@ export default function PatientDataTable({
                     </TableCell>
                   );
                 })}
-                <TableCell
-                  width={120}
-                  align="center"
-                  sx={{
-                    fontWeight: 700,
-                    color: "black",
-                    py: 2,
-                    backgroundColor: "#F1F5F9", // Updated Color
-                  }}
-                >
-                  AKSI
-                </TableCell>
+                {(canEdit || canDelete) && (
+                  <TableCell
+                    width={120}
+                    align="center"
+                    sx={{
+                      fontWeight: 700,
+                      color: "black",
+                      py: 2,
+                      backgroundColor: "#F1F5F9", // Updated Color
+                    }}
+                  >
+                    AKSI
+                  </TableCell>
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={effectiveColumns.length + 2}
+                    colSpan={
+                      effectiveColumns.length +
+                      1 +
+                      (canEdit || canDelete ? 1 : 0)
+                    }
                     align="center"
                     sx={{ py: 4 }}
                   >
@@ -1008,42 +1015,48 @@ export default function PatientDataTable({
                         </TableCell>
                       );
                     })}
-                    <TableCell align="center" sx={{ py: 1.5 }}>
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        justifyContent="center"
-                      >
-                        <Tooltip title="Edit">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEditPatient(row)}
-                            sx={{
-                              color: "#696CFF",
-                              "&:hover": {
-                                backgroundColor: "rgba(105, 108, 255, 0.1)",
-                              },
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Hapus">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteClick(row)}
-                            sx={{
-                              color: "#FF4C51",
-                              "&:hover": {
-                                backgroundColor: "rgba(255, 76, 81, 0.1)",
-                              },
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
+                    {(canEdit || canDelete) && (
+                      <TableCell align="center" sx={{ py: 1.5 }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="center"
+                        >
+                          {canEdit && (
+                            <Tooltip title="Edit">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEditPatient(row)}
+                                sx={{
+                                  color: "#696CFF",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(105, 108, 255, 0.1)",
+                                  },
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {canDelete && (
+                            <Tooltip title="Hapus">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteClick(row)}
+                                sx={{
+                                  color: "#FF4C51",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255, 76, 81, 0.1)",
+                                  },
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

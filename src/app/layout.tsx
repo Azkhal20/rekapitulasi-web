@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
-import { ThemeProvider } from '@mui/material/styles';
-import theme from '../theme/theme';
-import '../styles/globals.css';
+import { ThemeProvider } from "@mui/material/styles";
+import theme from "../theme/theme";
+import "../styles/globals.css";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import ReactQueryProvider from "@/components/providers/ReactQueryProvider";
 
 export const metadata: Metadata = {
   title: "Rekapitulasi Data",
@@ -24,9 +25,9 @@ export default function RootLayout(props: { children: React.ReactNode }) {
     <html lang="en" className={poppins.className}>
       <body>
         <AppRouterCacheProvider>
-          <ThemeProvider theme={theme}>
-              {children}
-          </ThemeProvider>
+          <ReactQueryProvider>
+            <ThemeProvider theme={theme}>{children}</ThemeProvider>
+          </ReactQueryProvider>
         </AppRouterCacheProvider>
       </body>
     </html>

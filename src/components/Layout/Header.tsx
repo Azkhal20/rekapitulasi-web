@@ -136,13 +136,13 @@ export default function Header({
                 variant="subtitle2"
                 sx={{ fontWeight: 600, lineHeight: 1.3, color: "#566a7f" }}
               >
-                {formatRole(userInfo.role)}
+                {formatRole(userInfo.fullName)}
               </Typography>
               <Typography
                 variant="caption"
                 sx={{ color: "#a1acb8", display: "block", fontSize: "0.75rem" }}
               >
-                {userInfo.fullName}
+                {userInfo.role}
               </Typography>
             </Box>
             <IconButton
@@ -191,29 +191,20 @@ export default function Header({
             anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
             PaperProps={{
               sx: {
-                mt: 1.5,
+                mt: 1,
                 minWidth: 200,
                 borderRadius: 2,
                 boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
               },
             }}
           >
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                {userInfo.fullName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {formatRole(userInfo.role)}
-              </Typography>
-            </Box>
-            <Divider />
             <MenuItem onClick={handleProfileOpen} sx={{ py: 1.5 }}>
               <ListItemIcon>
                 <PersonIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Profil</ListItemText>
             </MenuItem>
-            <Divider />
+            <Divider/>
             <MenuItem
               onClick={handleLogout}
               sx={{
