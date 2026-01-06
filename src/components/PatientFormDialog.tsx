@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { PatientData } from "@/services/patientService";
-import { Patient } from "@/types/patient"; // Import type Patient
+import { Patient } from "@/types/patient";
 
 interface PatientFormDialogProps {
   open: boolean;
@@ -27,9 +27,11 @@ interface PatientFormDialogProps {
   mode: "add" | "edit";
   defaultTahun?: string;
   existingPatients?: PatientData[] | Patient[]; // Use strict types if possible
+  lastL?: string;
+  lastP?: string;
 }
 
-// Helper: Convert "YYYY-MM-DD" to "DD MMM YYYY" (Indonesian)
+// Helper: Convert "YYYY-MM-DD" to "DD MMM YYYY"
 const formatDateForSheet = (isoDate: string): string => {
   if (!isoDate || !isoDate.includes("-")) return isoDate;
   try {
@@ -45,7 +47,7 @@ const formatDateForSheet = (isoDate: string): string => {
   }
 };
 
-// Helper: Convert "DD MMM YYYY" (Indonesian) to "YYYY-MM-DD"
+// Helper: Convert "DD MMM YYYY" to "YYYY-MM-DD"
 // Enhanced Parser to be more robust
 const parseDateFromSheet = (displayDate: string): string => {
   if (!displayDate) return "";
@@ -118,6 +120,8 @@ export default function PatientFormDialog({
   mode,
   defaultTahun,
   existingPatients = [],
+  lastL = "",
+  lastP = "",
 }: PatientFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -453,14 +457,16 @@ export default function PatientFormDialog({
                 value={formData.L}
                 onChange={(e) => handleChange("L", e.target.value)}
                 fullWidth
-                placeholder="1/0"
+                placeholder={lastL || "0"}
+                InputLabelProps={{ shrink: true }}
               />
               <TextField
                 label="Perempuan (P)"
                 value={formData.P}
                 onChange={(e) => handleChange("P", e.target.value)}
                 fullWidth
-                placeholder="1/0"
+                placeholder={lastP || "0"}
+                InputLabelProps={{ shrink: true }}
               />
             </Stack>
 

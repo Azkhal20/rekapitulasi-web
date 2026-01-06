@@ -31,6 +31,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import HistoryIcon from "@mui/icons-material/History";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
 import {
@@ -318,6 +319,13 @@ export default function PatientDataTable({
           const dateA = parseLocalDate(aValue);
           const dateB = parseLocalDate(bValue);
           comparison = dateA.getTime() - dateB.getTime();
+
+          // Jika tanggal sama, urutkan berdasarkan ID sebagai fallback
+          if (comparison === 0) {
+            const idA = Number((a as Record<string, unknown>).id) || 0;
+            const idB = Number((b as Record<string, unknown>).id) || 0;
+            comparison = idA - idB;
+          }
         }
         // Pengurutan Angka (misal USIA, NO)
         else {
@@ -363,6 +371,17 @@ export default function PatientDataTable({
     }
   };
 
+  const handleShowLatest = () => {
+    setSortColumn("TANGGAL");
+    setSortDirection("desc");
+    setPage(0);
+
+    Toast.fire({
+      icon: "info",
+      title: "Menampilkan data paling terbaru",
+    });
+  };
+
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterColumn("");
@@ -405,11 +424,41 @@ export default function PatientDataTable({
       }
     }
     setNextTahun(nextNum);
-
     setFormMode("add");
     setSelectedPatient(null);
     setFormDialogOpen(true);
   };
+
+  // Hitung Nilai L dan P Terakhir untuk Placeholder
+  const { lastL, lastP } = useMemo(() => {
+    let lVal = "";
+    let pVal = "";
+
+    if (data && data.length > 0) {
+      // Sort entry by ID desc (newests first)
+      const sorted = [...data].sort((a, b) => {
+        const idA = Number(getRowValue(a, "id")) || 0;
+        const idB = Number(getRowValue(b, "id")) || 0;
+        return idB - idA;
+      });
+
+      // Find first non-empty L
+      const foundL = sorted.find((row) => {
+        const val = String(getRowValue(row, "L") || "").trim();
+        return val !== "";
+      });
+      if (foundL) lVal = String(getRowValue(foundL, "L"));
+
+      // Find first non-empty P
+      const foundP = sorted.find((row) => {
+        const val = String(getRowValue(row, "P") || "").trim();
+        return val !== "";
+      });
+      if (foundP) pVal = String(getRowValue(foundP, "P"));
+    }
+
+    return { lastL: lVal, lastP: pVal };
+  }, [data]);
 
   const handleEditPatient = (patient: Patient | PatientData) => {
     setNextTahun("");
@@ -608,8 +657,26 @@ export default function PatientDataTable({
           justifyContent: "flex-end",
           alignItems: "center",
           mb: 3,
+          gap: 2,
         }}
       >
+        <Button
+          variant="outlined"
+          onClick={handleShowLatest}
+          startIcon={<HistoryIcon />}
+          sx={{
+            borderColor: "#696CFF",
+            color: "#696CFF",
+            "&:hover": {
+              borderColor: "#5f61e6",
+              backgroundColor: "rgba(105, 108, 255, 0.08)",
+            },
+            boxShadow: "0 2px 4px 0 rgba(105, 108, 255, 0.4)",
+            px: 3,
+          }}
+        >
+          DATA TERBARU
+        </Button>
         <Button
           variant="contained"
           onClick={handleAddPatient}
@@ -1022,6 +1089,8 @@ export default function PatientDataTable({
         mode={formMode}
         defaultTahun={nextTahun}
         existingPatients={data} // Pass all data for calculation
+        lastL={lastL}
+        lastP={lastP}
       />
     </Box>
   );

@@ -49,17 +49,8 @@ export default function PatientsPage() {
     return new Date().getFullYear().toString();
   });
 
-  // Effect to load saved month/year on mount, ONLY if they exist
-  useEffect(() => {
-    const savedMonth = localStorage.getItem("selectedMonthPatients");
-    if (savedMonth && MONTHS.includes(savedMonth)) {
-      setSelectedMonth(savedMonth);
-    }
-    const savedYear = localStorage.getItem("selectedYearPatients");
-    if (savedYear && YEARS.includes(savedYear)) {
-      setSelectedYear(savedYear);
-    }
-  }, []);
+  // No longer loading from localStorage on mount to ensure real-time month sync
+  // Users can still change it during session, but it will reset to current on next load
 
   const handleMonthChange = (e: SelectChangeEvent<string>) => {
     const newMonth = e.target.value;
