@@ -17,8 +17,8 @@ import {
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
-import LogoutIcon from "@mui/icons-material/Logout";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import SummarizeIcon from "@mui/icons-material/Summarize";
 import ExpandLess from "@mui/icons-material/ExpandLess";
@@ -338,46 +338,6 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
             })}
           </Box>
         ))}
-      </List>
-
-      <Box sx={{ flexGrow: 1 }} />
-
-      <List sx={{ px: 1.5, mb: 1 }}>
-        <ListItem disablePadding sx={{ display: "block" }}>
-          <ListItemButton
-            component={Link}
-            href="/"
-            sx={{
-              minHeight: 44,
-              justifyContent: open ? "initial" : "center",
-              px: 2.5,
-              borderRadius: 2,
-              color: "#ff3e1d", // Danger color
-              "&:hover": {
-                backgroundColor: "rgba(255, 62, 29, 0.1)",
-              },
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                minWidth: 0,
-                mr: open ? 2 : "auto",
-                justifyContent: "center",
-                color: "#ff3e1d",
-              }}
-            >
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Logout"
-              sx={{ opacity: open ? 1 : 0 }}
-              primaryTypographyProps={{
-                fontSize: "0.9375rem",
-                fontWeight: 500,
-              }}
-            />
-          </ListItemButton>
-        </ListItem>
       </List>
     </StyledDrawer>
   );
