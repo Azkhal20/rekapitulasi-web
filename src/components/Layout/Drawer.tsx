@@ -23,8 +23,14 @@ import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import SummarizeIcon from "@mui/icons-material/Summarize";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import { Box } from "@mui/material";
-import { useState } from "react";
+import {
+  Box,
+  Divider,
+  Paper,
+  ListItemButton as MuiListItemButton,
+} from "@mui/material";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import { useState, useEffect } from "react";
 
 const openedMixin = (theme: Theme, drawerWidth: number): CSSObject => ({
   width: drawerWidth,
@@ -121,6 +127,13 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
     setOpenGroups((prev) => ({ ...prev, [text]: !prev[text] }));
   };
 
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 60000); // update every minute
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <StyledDrawer variant="permanent" open={open} drawerWidth={drawerWidth}>
       {/* ... (kode DrawerHeader tidak berubah) */}
@@ -185,7 +198,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
               if (item.children) {
                 const isOpen = openGroups[item.text];
                 const isChildActive = item.children.some(
-                  (child) => pathname === child.href
+                  (child) => pathname === child.href,
                 );
 
                 return (
@@ -339,6 +352,9 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
           </Box>
         ))}
       </List>
+
+      {/* Sidebar Footer or Spacer if needed */}
+      <Box sx={{ mt: "auto", pb: 2 }} />
     </StyledDrawer>
   );
 }

@@ -9,15 +9,40 @@ import {
   Paper,
   ToggleButton,
   ToggleButtonGroup,
+  Select,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip as MuiChip,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Divider,
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import WcIcon from "@mui/icons-material/Wc";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Link from "next/link";
 import TopDiagnosisChart from "@/components/Dashboard/TopDiagnosisChart";
-import { patientService, PoliType } from "@/services/patientService";
+import {
+  patientService,
+  PoliType,
+  PatientData,
+} from "@/services/patientService";
+
+interface PeriodicData {
+  label: string;
+  total: number;
+  umum: number;
+  gigi: number;
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -28,6 +53,224 @@ export default function DashboardPage() {
     todayPatients: 0,
     todayGender: { L: 0, P: 0 },
   });
+
+  // State untuk total gabungan kedua poli
+  const [combinedStats, setCombinedStats] = useState({
+    totalBothPoli: 0,
+    totalL: 0,
+    totalP: 0,
+    periodTotals: {
+      umum: { total: 0, L: 0, P: 0 },
+      gigi: { total: 0, L: 0, P: 0 },
+    },
+  });
+
+  // Periode Filter untuk Real-time Stats
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const date = new Date();
+    return date.toLocaleDateString("id-ID", { month: "long" }).toUpperCase();
+  });
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    return new Date().getFullYear().toString();
+  });
+
+  const [serverTime, setServerTime] = useState<string>("");
+
+  useEffect(() => {
+    // Set initial time only on client
+    setServerTime(
+      new Date().toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
+
+    // Optional: Update time every minute
+    const interval = setInterval(() => {
+      setServerTime(
+        new Date().toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const periodName = `${selectedMonth} ${selectedYear}`;
+
+  // LOGIK REKAP TAHUNAN (GABUNGAN)
+  const [tableYear, setTableYear] = useState<string>(() => {
+    return new Date().getFullYear().toString();
+  });
+  const [periodicRekap, setPeriodicRekap] = useState<PeriodicData[]>([]);
+  const [loadingPeriodic, setLoadingPeriodic] = useState(false);
+
+  const fetchPeriodicRekap = useCallback(async () => {
+    try {
+      setLoadingPeriodic(true);
+      const yearNum = parseInt(tableYear);
+
+      // Generate exact 13 periods requested by user
+      const generatePeriods = (year: number) => {
+        interface PeriodDef {
+          label: string;
+          startDate: Date;
+          endDate: Date;
+          monthsInvolved: string[];
+        }
+        const periods: PeriodDef[] = [];
+        const MONTH_NAMES = [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
+        ];
+
+        // 1. 1 Jan - 15 Jan
+        periods.push({
+          label: `1 Januari ${year} - 15 Januari ${year}`,
+          startDate: new Date(year, 0, 1),
+          endDate: new Date(year, 0, 15),
+          monthsInvolved: [`JANUARI ${year}`],
+        });
+
+        // 2-12. 16 [M] - 15 [M+1]
+        for (let m = 0; m < 11; m++) {
+          const dStart = new Date(year, m, 16);
+          const dEnd = new Date(year, m + 1, 15);
+          const m1Name = `${MONTH_NAMES[m].toUpperCase()} ${year}`;
+          const m2Name = `${MONTH_NAMES[m + 1].toUpperCase()} ${year}`;
+          periods.push({
+            label: `16 ${MONTH_NAMES[m]} ${year} - 15 ${MONTH_NAMES[m + 1]} ${year}`,
+            startDate: dStart,
+            endDate: dEnd,
+            monthsInvolved: Array.from(new Set([m1Name, m2Name])),
+          });
+        }
+
+        // 13. 16 Des - 31 Des
+        periods.push({
+          label: `16 Desember ${year} - 31 Desember ${year}`,
+          startDate: new Date(year, 11, 16),
+          endDate: new Date(year, 11, 31),
+          monthsInvolved: [`DESEMBER ${year}`],
+        });
+
+        return periods;
+      };
+
+      const periods = generatePeriods(yearNum);
+      const allMonths = Array.from(
+        new Set(periods.flatMap((p) => p.monthsInvolved)),
+      );
+
+      const fetchAll = async (poli: PoliType) => {
+        const promises = allMonths.map((m) =>
+          patientService.getAllPatients(m, poli).catch(() => []),
+        );
+        const results = await Promise.all(promises);
+        const map: Record<string, PatientData[]> = {};
+        allMonths.forEach((m, i) => (map[m] = results[i]));
+        return map;
+      };
+
+      const [umumMap, gigiMap] = await Promise.all([
+        fetchAll("umum"),
+        fetchAll("gigi"),
+      ]);
+
+      const rekap = periods.map((period) => {
+        const calculateTotals = (data: PatientData[]) => {
+          let countL = 0;
+          let countP = 0;
+
+          data.forEach((p) => {
+            if (!p.TANGGAL) return;
+            // Validasi baris data: Hindari baris header/subheader
+            const tglStr = String(p.TANGGAL).trim().toLowerCase();
+            if (tglStr === "tanggal" || tglStr === "tgl") return;
+
+            const pDate = parseRowDate(String(p.TANGGAL));
+            // Fix off-by-1 error: endDate should include the entire day
+            const periodEndDateInclusive = new Date(
+              period.endDate.getFullYear(),
+              period.endDate.getMonth(),
+              period.endDate.getDate() + 1,
+            );
+
+            if (
+              !isNaN(pDate.getTime()) &&
+              pDate >= period.startDate &&
+              pDate < periodEndDateInclusive
+            ) {
+              // Validasi tambahan untuk L/P: Pastikan bukan header "L" atau "P"
+              const valL = String(p.L || "").trim();
+              const valP = String(p.P || "").trim();
+
+              if (
+                valL &&
+                valL !== "-" &&
+                valL !== "0" &&
+                valL.toLowerCase() !== "l"
+              )
+                countL++;
+              if (
+                valP &&
+                valP !== "-" &&
+                valP !== "0" &&
+                valP.toLowerCase() !== "p"
+              )
+                countP++;
+            }
+          });
+          return { L: countL, P: countP, total: countL + countP };
+        };
+
+        const periodUmum = { L: 0, P: 0, total: 0 };
+        const periodGigi = { L: 0, P: 0, total: 0 };
+
+        period.monthsInvolved.forEach((m) => {
+          const u = calculateTotals(umumMap[m] || []);
+          const g = calculateTotals(gigiMap[m] || []);
+
+          periodUmum.L += u.L;
+          periodUmum.P += u.P;
+          periodUmum.total += u.total;
+
+          periodGigi.L += g.L;
+          periodGigi.P += g.P;
+          periodGigi.total += g.total;
+        });
+
+        return {
+          label: period.label,
+          total: periodUmum.total + periodGigi.total,
+          umum: periodUmum.total,
+          gigi: periodGigi.total,
+        };
+      });
+
+      setPeriodicRekap(rekap);
+    } catch (err) {
+      console.error("Gagal memuat rekap berkala:", err);
+    } finally {
+      setLoadingPeriodic(false);
+    }
+  }, [tableYear]);
+
+  useEffect(() => {
+    fetchPeriodicRekap();
+  }, [fetchPeriodicRekap]);
 
   // Load selected poli from localStorage saat mount
   useEffect(() => {
@@ -45,95 +288,102 @@ export default function DashboardPage() {
     }
   }, [selectedPoli, isStorageLoaded]);
 
-  // Helper: Check if cell is filled (truthy, not empty string, not dash)
+  // Helper: Check if cell is filled (truthy, not empty string, not dash, not '0', not header)
   const isFilled = (val: unknown) => {
     if (!val) return false;
     const s = String(val).trim();
+    // Exclude header values if any slipped through
+    if (s.toLowerCase() === "l" || s.toLowerCase() === "p") return false;
     return s !== "" && s !== "-" && s !== "0";
   };
 
-  // Helper: Get Current Month Name (Indonesia)
-  const getCurrentMonthName = () => {
-    const date = new Date();
-    const month = date.toLocaleDateString("id-ID", { month: "long" });
-    const year = date.getFullYear();
-    return `${month.toUpperCase()} ${year}`;
-  };
-
-  const currentMonthName = getCurrentMonthName();
-
   const handlePoliChange = (
     _event: React.MouseEvent<HTMLElement>,
-    newPoli: PoliType | null
+    newPoli: PoliType | null,
   ) => {
     if (newPoli !== null) {
       setSelectedPoli(newPoli);
     }
   };
 
-  // Helper: Convert "DD MMM YYYY" (Indonesian) to "YYYY-MM-DD"
-  const parseDateFromSheet = (displayDate: string): string => {
-    if (!displayDate) return "";
-    const cleanDate = displayDate.trim();
+  const MONTHS = [
+    "JANUARI",
+    "FEBRUARI",
+    "MARET",
+    "APRIL",
+    "MEI",
+    "JUNI",
+    "JULI",
+    "AGUSTUS",
+    "SEPTEMBER",
+    "OKTOBER",
+    "NOVEMBER",
+    "DESEMBER",
+  ];
+  const YEARS = Array.from({ length: 4 }, (_, i) => (2025 + i).toString());
 
-    // Already ISO?
-    if (cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) return cleanDate;
-
-    const MONTH_MAP: Record<string, string> = {
-      jan: "01",
-      feb: "02",
-      mar: "03",
-      apr: "04",
-      mei: "05",
-      jun: "06",
-      jul: "07",
-      agu: "08",
-      sep: "09",
-      okt: "10",
-      nov: "11",
-      des: "12",
-      januari: "01",
-      februari: "02",
-      maret: "03",
-      april: "04",
-      agustus: "08",
-      september: "09",
-      oktober: "10",
-      november: "11",
-      desember: "12",
-    };
-
-    try {
-      const parts = cleanDate.split(/\s+/);
-      if (parts.length >= 3) {
-        const day = parts[0].padStart(2, "0");
-        const monthStr = parts[1].toLowerCase();
-        const year = parts[2];
-        let month = MONTH_MAP[monthStr];
-
-        if (!month) {
-          const key = Object.keys(MONTH_MAP).find(
-            (k) => k.startsWith(monthStr) || monthStr.startsWith(k)
-          );
-          if (key) month = MONTH_MAP[key];
-        }
-
-        if (month && year.length === 4) {
-          return `${year}-${month}-${day}`;
+  const parseRowDate = (dateStr: string): Date => {
+    if (!dateStr || dateStr === "-") return new Date("Invalid");
+    const cleanStr = dateStr.trim();
+    const d = new Date(cleanStr);
+    if (!isNaN(d.getTime())) return d;
+    const parts = cleanStr.split(/[\s-/]+/);
+    if (parts.length >= 3) {
+      let day: number, monthIndex: number | undefined, year: number;
+      if (parts[0].length === 4 && !isNaN(parseInt(parts[0]))) {
+        year = parseInt(parts[0]);
+        monthIndex = parseInt(parts[1]) - 1;
+        day = parseInt(parts[2]);
+      } else {
+        day = parseInt(parts[0]);
+        const monthRaw = parts[1].toLowerCase();
+        year = parseInt(parts[2]);
+        if (!isNaN(parseInt(monthRaw))) {
+          monthIndex = parseInt(monthRaw) - 1;
+        } else {
+          const monthsID: Record<string, number> = {
+            januari: 0,
+            februari: 1,
+            maret: 2,
+            april: 3,
+            mei: 4,
+            juni: 5,
+            juli: 6,
+            agustus: 7,
+            september: 8,
+            oktober: 9,
+            november: 10,
+            desember: 11,
+            jan: 0,
+            feb: 1,
+            mar: 2,
+            apr: 3,
+            jun: 5,
+            jul: 6,
+            ags: 7,
+            sep: 8,
+            okt: 9,
+            nov: 10,
+            des: 11,
+          };
+          monthIndex = monthsID[monthRaw];
         }
       }
-      return "";
-    } catch {
-      return "";
+      if (monthIndex !== undefined && !isNaN(day) && !isNaN(year)) {
+        if (monthIndex >= 0 && monthIndex <= 11 && day >= 1 && day <= 31) {
+          return new Date(year, monthIndex, day);
+        }
+      }
     }
+    return new Date("Invalid");
   };
 
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
       const data = await patientService.getAllPatients(
-        currentMonthName,
-        selectedPoli
+        periodName,
+        selectedPoli,
       );
 
       const total = data.length;
@@ -147,8 +397,15 @@ export default function DashboardPage() {
 
       const todayData = data.filter((p) => {
         if (!p.TANGGAL) return false;
-        const pDate = parseDateFromSheet(p.TANGGAL);
-        return pDate === todayStr;
+        const pDateObj = parseRowDate(String(p.TANGGAL));
+        if (isNaN(pDateObj.getTime())) return false;
+
+        const pYear = pDateObj.getFullYear();
+        const pMonth = (pDateObj.getMonth() + 1).toString().padStart(2, "0");
+        const pDay = pDateObj.getDate().toString().padStart(2, "0");
+        const pDateStr = `${pYear}-${pMonth}-${pDay}`;
+
+        return pDateStr === todayStr;
       });
 
       const todayCount = todayData.length;
@@ -175,14 +432,63 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedPoli, currentMonthName]);
+  }, [selectedPoli, periodName]);
+
+  const fetchCombinedStats = useCallback(async () => {
+    try {
+      // Fetch data dari kedua poli secara paralel
+      const [dataUmum, dataGigi] = await Promise.all([
+        patientService.getAllPatients(periodName, "umum"),
+        patientService.getAllPatients(periodName, "gigi"),
+      ]);
+
+      // Hitung total untuk Umum
+      const resUmumTotal = dataUmum.length;
+      let resUmumL = 0;
+      let resUmumP = 0;
+      dataUmum.forEach((p) => {
+        if (isFilled(p.L)) resUmumL++;
+        if (isFilled(p.P)) resUmumP++;
+      });
+
+      // Hitung total untuk Gigi
+      const resGigiTotal = dataGigi.length;
+      let resGigiL = 0;
+      let resGigiP = 0;
+      dataGigi.forEach((p) => {
+        if (isFilled(p.L)) resGigiL++;
+        if (isFilled(p.P)) resGigiP++;
+      });
+
+      setCombinedStats({
+        totalBothPoli: resUmumTotal + resGigiTotal,
+        totalL: resUmumL + resGigiL,
+        totalP: resUmumP + resGigiP,
+        periodTotals: {
+          umum: { total: resUmumTotal, L: resUmumL, P: resUmumP },
+          gigi: { total: resGigiTotal, L: resGigiL, P: resGigiP },
+        },
+      });
+    } catch (error) {
+      console.error("Failed to fetch combined stats:", error);
+      setCombinedStats({
+        totalBothPoli: 0,
+        totalL: 0,
+        totalP: 0,
+        periodTotals: {
+          umum: { total: 0, L: 0, P: 0 },
+          gigi: { total: 0, L: 0, P: 0 },
+        },
+      });
+    }
+  }, [periodName]);
 
   useEffect(() => {
-    // Hanya fetch data setelah localStorage selesai di-load
     if (isStorageLoaded) {
       fetchStats();
+      fetchCombinedStats();
     }
-  }, [fetchStats, isStorageLoaded]);
+  }, [fetchStats, fetchCombinedStats, isStorageLoaded]);
 
   const stats = [
     {
@@ -193,7 +499,7 @@ export default function DashboardPage() {
         selectedPoli === "gigi"
           ? "linear-gradient(135deg, #F472B6 0%, #DB2777 100%)"
           : "linear-gradient(135deg, #818CF8 0%, #4F46E5 100%)",
-      trend: `Bulan ${currentMonthName}`,
+      trend: `Bulan ${periodName}`,
       trendColor: selectedPoli === "gigi" ? "#DB2777" : "#4F46E5",
       trendBg:
         selectedPoli === "gigi"
@@ -256,49 +562,102 @@ export default function DashboardPage() {
           </Typography>
         </Box>
 
-        <Paper
-          elevation={0}
-          sx={{
-            p: 0.5,
-            borderRadius: "12px",
-            bgcolor: "#F1F5F9",
-            border: "1px solid #E2E8F0",
-          }}
-        >
-          <ToggleButtonGroup
-            value={selectedPoli}
-            exclusive
-            onChange={handlePoliChange}
-            aria-label="Pilih Poli"
-            size="small"
+        <Box display="flex" gap={2} flexWrap="wrap">
+          <Paper
+            elevation={0}
             sx={{
-              "& .MuiToggleButton-root": {
-                border: "none",
-                px: 2,
-                py: 1,
-                borderRadius: "8px !important",
-                fontWeight: 600,
-                textTransform: "none",
-                color: "#64748B",
-                "&.Mui-selected": {
-                  bgcolor: "white",
-                  color: "primary.main",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                  "&:hover": { bgcolor: "white" },
-                },
-              },
+              p: 0.5,
+              borderRadius: "12px",
+              bgcolor: "#F1F5F9",
+              border: "1px solid #E2E8F0",
+              display: "flex",
+              gap: 1,
             }}
           >
-            <ToggleButton value="umum">
-              <PeopleIcon sx={{ mr: 1, fontSize: 18 }} />
-              Poli Umum
-            </ToggleButton>
-            <ToggleButton value="gigi">
-              <MedicalServicesIcon sx={{ mr: 1, fontSize: 18 }} />
-              Poli Gigi
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Paper>
+            <Select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              size="small"
+              sx={{
+                borderRadius: "8px",
+                bgcolor: "white",
+                minWidth: 130,
+                "& fieldset": { border: "none" },
+                fontWeight: 600,
+                fontSize: "0.85rem",
+              }}
+            >
+              {MONTHS.map((m) => (
+                <MenuItem key={m} value={m}>
+                  {m}
+                </MenuItem>
+              ))}
+            </Select>
+            <Select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              size="small"
+              sx={{
+                borderRadius: "8px",
+                bgcolor: "white",
+                minWidth: 90,
+                "& fieldset": { border: "none" },
+                fontWeight: 600,
+                fontSize: "0.85rem",
+              }}
+            >
+              {YEARS.map((y) => (
+                <MenuItem key={y} value={y}>
+                  {y}
+                </MenuItem>
+              ))}
+            </Select>
+          </Paper>
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 0.5,
+              borderRadius: "12px",
+              bgcolor: "#F1F5F9",
+              border: "1px solid #E2E8F0",
+            }}
+          >
+            <ToggleButtonGroup
+              value={selectedPoli}
+              exclusive
+              onChange={handlePoliChange}
+              aria-label="Pilih Poli"
+              size="small"
+              sx={{
+                "& .MuiToggleButton-root": {
+                  border: "none",
+                  px: 2,
+                  py: 1,
+                  borderRadius: "8px !important",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  color: "#64748B",
+                  "&.Mui-selected": {
+                    bgcolor: "white",
+                    color: "primary.main",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                    "&:hover": { bgcolor: "white" },
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="umum">
+                <PeopleIcon sx={{ mr: 1, fontSize: 18 }} />
+                Poli Umum
+              </ToggleButton>
+              <ToggleButton value="gigi">
+                <MedicalServicesIcon sx={{ mr: 1, fontSize: 18 }} />
+                Poli Gigi
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Paper>
+        </Box>
       </Box>
 
       {/* Statistics Cards */}
@@ -414,9 +773,16 @@ export default function DashboardPage() {
               overflow: "hidden",
             }}
           >
-            <TopDiagnosisChart poliType={selectedPoli} />
+            <TopDiagnosisChart
+              poliType={selectedPoli}
+              targetMonth={selectedMonth}
+              targetYear={selectedYear}
+            />
           </Paper>
+        </Box>
 
+        {/* Right Col: Container Status & Akses Cepat */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <Paper
             elevation={0}
             sx={{
@@ -424,166 +790,526 @@ export default function DashboardPage() {
               borderRadius: "24px",
               border: "1px solid #F1F5F9",
               boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 3,
             }}
           >
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              mb={3}
-            >
-              <Box>
-                <Typography variant="h6" fontWeight="800" color="#1E293B">
-                  Akses Cepat Tindakan
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pusat pengelolaan data poli {selectedPoli}
-                </Typography>
+            {/* Status Sistem Section */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                fontWeight="800"
+                color="#64748B"
+                sx={{ textTransform: "uppercase", mb: 2, letterSpacing: 1 }}
+              >
+                Status Sistem
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    bgcolor: "#F0FDF4",
+                    borderRadius: "16px",
+                    border: "1px solid #BBF7D0",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="#166534">
+                    Backend Connected
+                  </Typography>
+                  <Typography variant="caption" color="#15803D">
+                    Google Sheets API V5 active
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    p: 2,
+                    bgcolor: "#F8FAFC",
+                    borderRadius: "16px",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="primary">
+                    Waktu Server
+                  </Typography>
+                  <Typography variant="caption" color="#64748B">
+                    {serverTime || "..."} WIB
+                  </Typography>
+                </Box>
               </Box>
             </Box>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                gap: 2,
-              }}
-            >
+
+            <Divider />
+
+            {/* Akses Cepat Section */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                fontWeight="800"
+                color="#64748B"
+                sx={{ textTransform: "uppercase", mb: 2, letterSpacing: 1 }}
+              >
+                Akses Cepat
+              </Typography>
               <Box
                 component={Link}
-                href={`/dashboard/patients`}
+                href="/dashboard/patients"
                 sx={{
                   p: 2.5,
                   borderRadius: "16px",
-                  border: "1px solid #F1F5F9",
-                  bgcolor: "#F8FAFC",
+                  bgcolor: "#696CFF",
                   textDecoration: "none",
-                  transition: "all 0.2s",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  transition: "all 0.2s",
                   "&:hover": {
-                    bgcolor: "white",
-                    borderColor: "primary.main",
-                    transform: "scale(1.02)",
-                    boxShadow: "0 10px 20px -5px rgba(79,70,229,0.12)",
-                    "& .arrow": {
-                      color: "primary.main",
-                      transform: "translateX(4px)",
-                    },
+                    bgcolor: "#5F61E6",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 8px 15px rgba(105, 108, 255, 0.25)",
                   },
                 }}
               >
                 <Box display="flex" gap={2} alignItems="center">
                   <Box
                     sx={{
-                      p: 1.5,
-                      borderRadius: "12px",
-                      bgcolor: "white",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                      color: "primary.main",
+                      p: 1,
+                      borderRadius: "10px",
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
                     }}
                   >
-                    <PeopleIcon />
+                    <PeopleIcon sx={{ fontSize: 20 }} />
                   </Box>
                   <Box>
                     <Typography
-                      variant="subtitle1"
+                      variant="subtitle2"
                       fontWeight="700"
-                      color="#1E293B"
+                      color="white"
                     >
-                      Kelola Data Pasien
+                      Kelola Pasien
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Input & Edit Pasien {selectedPoli}
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "rgba(255,255,255,0.8)" }}
+                    >
+                      Input & Edit Data
                     </Typography>
                   </Box>
                 </Box>
-                <ArrowForwardIcon
-                  className="arrow"
-                  sx={{ fontSize: 20, transition: "0.2s", color: "#94A3B8" }}
-                />
-              </Box>
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: "16px",
-                  border: "1px dashed #E2E8F0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: "#F8FAFC",
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  color="#94A3B8"
-                  sx={{ fontStyle: "italic" }}
-                >
-                  Fitur Lainnya Segera Hadir
-                </Typography>
+                <ArrowForwardIcon sx={{ color: "white", fontSize: 18 }} />
               </Box>
             </Box>
           </Paper>
         </Box>
+      </Box>
 
-        {/* Right Col: System Status */}
-        <Paper
-          elevation={0}
+      {/* Ringkasan Gabungan (Umum & Gigi) */}
+      {/* Ringkasan Gabungan (Umum & Gigi) */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 5,
+          mt: 4, // Added spacing from top sections
+          p: 3,
+          borderRadius: "24px",
+          border: "1px solid #F1F5F9",
+          bgcolor: "white", // Changed to white
+          boxShadow: "0 4px 20px rgba(0,0,0,0.04)", // Added shadow
+        }}
+      >
+        <Typography
+          variant="h6"
+          fontWeight="800"
+          sx={{ mb: 2.5, color: "#1E293B", letterSpacing: "-0.01em" }}
+        >
+          Ringkasan Gabungan (Umum & Gigi)
+        </Typography>
+        <Box
           sx={{
-            p: 3,
-            borderRadius: "24px",
-            border: "1px solid #F1F5F9",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
-            height: "100%",
-            display: { xs: "none", xl: "flex" },
-            flexDirection: "column",
-            gap: 2,
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: 3,
           }}
         >
-          <Typography
-            variant="subtitle2"
-            fontWeight="800"
-            color="#64748B"
-            sx={{ textTransform: "uppercase" }}
-          >
-            Status Sistem
-          </Typography>
-          <Box
+          {/* Card: Total Akumulasi Gabungan */}
+          <Card
             sx={{
-              p: 2,
-              bgcolor: "#F0FDF4",
-              borderRadius: "16px",
-              border: "1px solid #BBF7D0",
+              borderRadius: "24px",
+              background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+              color: "white",
+              boxShadow: "0 10px 25px rgba(79, 70, 229, 0.2)",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <Typography variant="body2" fontWeight="700" color="#166534">
-              Backend Connected
-            </Typography>
-            <Typography variant="caption" color="#15803D">
-              Google Sheets API V5 is active
-            </Typography>
-          </Box>
-          <Box
+            <Box
+              sx={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                opacity: 0.2,
+              }}
+            >
+              <PeopleIcon sx={{ fontSize: 160 }} />
+            </Box>
+            <CardContent sx={{ p: 3.5 }}>
+              <Typography
+                variant="overline"
+                sx={{ opacity: 0.8, letterSpacing: 2, fontWeight: 700 }}
+              >
+                Total Akumulasi Pasien
+              </Typography>
+              <Typography variant="h2" fontWeight="900" sx={{ mt: 1, mb: 2 }}>
+                {loading ? "..." : combinedStats.totalBothPoli.toLocaleString()}
+              </Typography>
+              <Box display="flex" gap={2}>
+                <Box
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    px: 2,
+                    py: 1,
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="white">
+                    L: {combinedStats.totalL}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    px: 2,
+                    py: 1,
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="white">
+                    P: {combinedStats.totalP}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Card: Perincian Per Periode (Bulan Ini) */}
+          <Card
             sx={{
-              p: 2,
-              bgcolor: "#F8FAFC",
-              borderRadius: "16px",
+              borderRadius: "24px",
               border: "1px solid #E2E8F0",
+              bgcolor: "white",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
             }}
           >
-            <Typography variant="body2" fontWeight="700" color="primary">
-              Waktu Server
-            </Typography>
-            <Typography variant="caption" color="#64748B">
-              {new Date().toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              WIB
-            </Typography>
+            <CardContent sx={{ p: 3.5 }}>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+              >
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="800"
+                  color="#1E293B"
+                >
+                  Kunjungan Filtered: {periodName}
+                </Typography>
+                <Box
+                  sx={{
+                    background:
+                      "linear-gradient(90deg, #F59E0B 0%, #D97706 100%)",
+                    color: "white",
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: "20px",
+                    fontSize: "0.75rem",
+                    fontWeight: 800,
+                    boxShadow: "0 2px 6px rgba(245, 158, 11, 0.3)",
+                  }}
+                >
+                  {combinedStats.totalBothPoli} TOTAL
+                </Box>
+              </Box>
+
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "#4F46E5",
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight="700"
+                      color="#475569"
+                    >
+                      Poli Umum
+                    </Typography>
+                  </Box>
+                  <Box textAlign="right">
+                    <Typography
+                      variant="body2"
+                      fontWeight="800"
+                      color="#1E293B"
+                    >
+                      {loading ? "..." : combinedStats.periodTotals.umum.total}{" "}
+                      Pasien
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      fontWeight="600"
+                    >
+                      {combinedStats.periodTotals.umum.L} L |{" "}
+                      {combinedStats.periodTotals.umum.P} P
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "#DB2777",
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight="700"
+                      color="#475569"
+                    >
+                      Poli Gigi
+                    </Typography>
+                  </Box>
+                  <Box textAlign="right">
+                    <Typography
+                      variant="body2"
+                      fontWeight="800"
+                      color="#1E293B"
+                    >
+                      {loading ? "..." : combinedStats.periodTotals.gigi.total}{" "}
+                      Pasien
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      fontWeight="600"
+                    >
+                      {combinedStats.periodTotals.gigi.L} L |{" "}
+                      {combinedStats.periodTotals.gigi.P} P
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              <Box sx={{ height: "1px", bgcolor: "#F1F5F9", my: 2.5 }} />
+
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontWeight="600"
+                >
+                  Total Periode Ini
+                </Typography>
+                <Typography
+                  variant="body1"
+                  fontWeight="900"
+                  color="primary.main"
+                >
+                  {loading
+                    ? "..."
+                    : combinedStats.periodTotals.umum.total +
+                      combinedStats.periodTotals.gigi.total}{" "}
+                  Pasien
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Paper>
+
+      {/* Full Width Table Section: Rekap Total Kunjungan Per Periode */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 5,
+          p: 3,
+          borderRadius: "24px",
+          border: "1px solid #F1F5F9",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={3}
+        >
+          <Box display="flex" alignItems="center" gap={2}>
+            <EventNoteIcon sx={{ color: "primary.main", fontSize: 32 }} />
+            <Box>
+              <Typography variant="h5" fontWeight="800" color="#1E293B">
+                Rekap Total Kunjungan Pasien per Periode {tableYear}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Akumulasi data kunjungan Poli Umum dan Poli Gigi per Periode
+              </Typography>
+            </Box>
           </Box>
-        </Paper>
-      </Box>
+
+          <FormControl sx={{ minWidth: 160 }}>
+            <InputLabel id="table-year-select-label">Pilih Tahun</InputLabel>
+            <Select
+              labelId="table-year-select-label"
+              value={tableYear}
+              label="Pilih Tahun"
+              onChange={(e) => setTableYear(e.target.value)}
+              sx={{
+                borderRadius: "12px",
+                bgcolor: "white",
+                "& .MuiSelect-select": { py: 1.5 },
+                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+              }}
+            >
+              {YEARS.map((y) => (
+                <MenuItem key={y} value={y}>
+                  Tahun {y}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+              <TableRow>
+                <TableCell
+                  sx={{
+                    fontWeight: 800,
+                    color: "#475569",
+                    fontSize: "0.95rem",
+                    width: "30%", // Reduced width
+                  }}
+                >
+                  PERIODE
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 800,
+                    color: "#4F46E5",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  TOTAL GABUNGAN
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 800,
+                    color: "#0D9488",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  POLI UMUM
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{
+                    fontWeight: 800,
+                    color: "#DB2777",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  POLI GIGI
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loadingPeriodic ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={32} />
+                    <Typography sx={{ mt: 2 }} color="text.secondary">
+                      Menghitung Data Tahunan...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : periodicRekap.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">
+                      Tidak ada data untuk ditampilkan
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                periodicRekap.map((row, idx) => (
+                  <TableRow
+                    key={idx}
+                    hover
+                    sx={{ "&:last-child td": { border: 0 } }}
+                  >
+                    <TableCell sx={{ fontWeight: 700, color: "#334155" }}>
+                      {row.label}
+                    </TableCell>
+                    <TableCell align="center">
+                      <MuiChip
+                        label={`${row.total} Pasien`}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          bgcolor: "#EEF2FF",
+                          color: "#4F46E5",
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ fontWeight: 600, color: "#0D9488" }}
+                    >
+                      {row.umum}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ fontWeight: 600, color: "#DB2777" }}
+                    >
+                      {row.gigi}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     </Box>
   );
 }
