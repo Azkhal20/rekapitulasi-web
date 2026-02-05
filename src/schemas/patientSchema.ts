@@ -28,6 +28,17 @@ export const PatientSchema = z.object({
   ICD10: z.string().optional(),
   TINDAKAN: z.string().optional(), // Bisa jadi TINDAKAN atau TINDAKAN (spasi)
   OBAT: z.string().optional(),
+  // Kolom Rujukan (Q-Z)
+  RUJUK_FASKES_PERTAMA_PB: numericString,
+  RUJUK_FASKES_PERTAMA_PL: numericString,
+  RUJUK_FKRTL_PB: numericString,
+  RUJUK_FKRTL_PL: numericString,
+  PTM_RUJUK_FKRTL_PB: numericString,
+  PTM_RUJUK_FKRTL_PL: numericString,
+  DIRUJUK_BALIK_PUSKESMAS_PB: numericString,
+  DIRUJUK_BALIK_PUSKESMAS_PL: numericString,
+  DIRUJUK_BALIK_FKRTL_PB: numericString,
+  DIRUJUK_BALIK_FKRTL_PL: numericString,
 });
 
 export type Patient = z.infer<typeof PatientSchema>;

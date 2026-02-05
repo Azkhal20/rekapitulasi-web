@@ -83,7 +83,7 @@ interface PatientDataTableProps {
 // Fungsi bantu untuk akses properti dengan aman
 function getRowValue(
   row: Patient | PatientData,
-  column: string
+  column: string,
 ): string | number {
   return (row as Record<string, unknown>)[column] as string | number;
 }
@@ -109,13 +109,13 @@ export default function PatientDataTable({
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(
-    null
+    null,
   );
 
   // React Query Mutations
   const { addMutation, updateMutation, deleteMutation } = usePatientMutations(
     sheetName,
-    poliType
+    poliType,
   );
 
   const [nextTahun, setNextTahun] = useState<string>("1");
@@ -129,7 +129,7 @@ export default function PatientDataTable({
   // Kolom default jika data kosong (untuk menampilkan header)
   const effectiveColumns = useMemo(() => {
     if (columns.length > 0) return columns;
-    // Default urutan header sesuai Google Sheet
+    // Default urutan header sesuai Google Sheet (termasuk rujukan)
     return [
       "TANGGAL",
       "HARI",
@@ -147,6 +147,16 @@ export default function PatientDataTable({
       "ICD-10",
       "TINDAKAN",
       "OBAT",
+      "RUJUK_FASKES_PERTAMA_PB",
+      "RUJUK_FASKES_PERTAMA_PL",
+      "RUJUK_FKRTL_PB",
+      "RUJUK_FKRTL_PL",
+      "PTM_RUJUK_FKRTL_PB",
+      "PTM_RUJUK_FKRTL_PL",
+      "DIRUJUK_BALIK_PUSKESMAS_PB",
+      "DIRUJUK_BALIK_PUSKESMAS_PL",
+      "DIRUJUK_BALIK_FKRTL_PB",
+      "DIRUJUK_BALIK_FKRTL_PL",
     ];
   }, [columns]);
 
@@ -247,7 +257,7 @@ export default function PatientDataTable({
     }
 
     return values.sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
+      a.localeCompare(b, undefined, { numeric: true }),
     );
   };
 
@@ -255,30 +265,42 @@ export default function PatientDataTable({
   const getColumnWidth = (column: string): number | string => {
     const widthMap: Record<string, number | string> = {
       // Kolom kecil (angka/short text)
-      TAHUN: 60,
-      BULAN: 100,
-      HARI: 90,
+      TAHUN: 65,
+      BULAN: 85,
+      HARI: 70,
       "16-15": 70,
-      L: 60,
-      P: 60,
+      L: 55,
+      P: 55,
       USIA: 70,
 
       // Kolom sedang
-      TANGGAL: 120,
-      NIP: 190,
-      "ICD-10": 80,
-      ICD10: 80,
+      TANGGAL: 125,
+      "ICD-10": 120, // Diperbesar
+      ICD10: 120, // Diperbesar
 
-      // Kolom besar (nama)
-      NAMA: 180,
+      // Kolom besar (nama dan identitas)
+      NAMA: 220, // Diperbesar untuk nama panjang
+      NIP: 220, // Diperbesar untuk NIP panjang
 
       // Kolom sangat besar (teks panjang)
-      "OBS TTV": 220,
-      KELUHAN: 300,
-      DIAGNOSIS: 200,
+      "OBS TTV": 250,
+      KELUHAN: 350, // Diperbesar
+      DIAGNOSIS: 220,
       TINDAKAN: 220,
       "TINDAKAN ": 220,
-      OBAT: 220,
+      OBAT: 300, // Diperbesar untuk daftar obat panjang
+
+      // Kolom Rujukan (PB/PL)
+      RUJUK_FASKES_PERTAMA_PB: 70,
+      RUJUK_FASKES_PERTAMA_PL: 70,
+      RUJUK_FKRTL_PB: 70,
+      RUJUK_FKRTL_PL: 70,
+      PTM_RUJUK_FKRTL_PB: 70,
+      PTM_RUJUK_FKRTL_PL: 70,
+      DIRUJUK_BALIK_PUSKESMAS_PB: 70,
+      DIRUJUK_BALIK_PUSKESMAS_PL: 70,
+      DIRUJUK_BALIK_FKRTL_PB: 70,
+      DIRUJUK_BALIK_FKRTL_PL: 70,
     };
 
     return widthMap[column] || 150;
@@ -298,15 +320,15 @@ export default function PatientDataTable({
       const query = searchQuery.toLowerCase();
       result = result.filter((row) =>
         Object.values(row).some((value) =>
-          String(value).toLowerCase().includes(query)
-        )
+          String(value).toLowerCase().includes(query),
+        ),
       );
     }
 
     // Filter Kolom
     if (filterColumn && filterValue) {
       result = result.filter(
-        (row) => String(getRowValue(row, filterColumn)) === filterValue
+        (row) => String(getRowValue(row, filterColumn)) === filterValue,
       );
     }
 
@@ -402,7 +424,7 @@ export default function PatientDataTable({
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -481,7 +503,7 @@ export default function PatientDataTable({
       BULAN: String(p.BULAN || ""),
       HARI: String(p.HARI || ""),
       ENAM_BELAS_LIMA_BELAS: String(
-        p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || ""
+        p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || "",
       ),
       L: String(p.L || ""),
       P: String(p.P || ""),
@@ -495,6 +517,17 @@ export default function PatientDataTable({
       ICD10: String(p["ICD-10"] || p["ICD 10"] || p.ICD10 || ""),
       TINDAKAN: String(p["TINDAKAN"] || p["TINDAKAN "] || p.TINDAKAN || ""),
       OBAT: String(p.OBAT || ""),
+      // Mapping untuk kolom rujukan
+      RUJUK_FASKES_PERTAMA_PB: String(p.RUJUK_FASKES_PERTAMA_PB || ""),
+      RUJUK_FASKES_PERTAMA_PL: String(p.RUJUK_FASKES_PERTAMA_PL || ""),
+      RUJUK_FKRTL_PB: String(p.RUJUK_FKRTL_PB || ""),
+      RUJUK_FKRTL_PL: String(p.RUJUK_FKRTL_PL || ""),
+      PTM_RUJUK_FKRTL_PB: String(p.PTM_RUJUK_FKRTL_PB || ""),
+      PTM_RUJUK_FKRTL_PL: String(p.PTM_RUJUK_FKRTL_PL || ""),
+      DIRUJUK_BALIK_PUSKESMAS_PB: String(p.DIRUJUK_BALIK_PUSKESMAS_PB || ""),
+      DIRUJUK_BALIK_PUSKESMAS_PL: String(p.DIRUJUK_BALIK_PUSKESMAS_PL || ""),
+      DIRUJUK_BALIK_FKRTL_PB: String(p.DIRUJUK_BALIK_FKRTL_PB || ""),
+      DIRUJUK_BALIK_FKRTL_PL: String(p.DIRUJUK_BALIK_FKRTL_PL || ""),
     };
 
     setSelectedPatient(patientData);
@@ -507,7 +540,7 @@ export default function PatientDataTable({
     MySwal.fire({
       title: "Apakah Anda yakin?",
       text: `Anda akan menghapus data pasien ${String(
-        p.NAMA || "ini"
+        p.NAMA || "ini",
       )}. Data tidak dapat dikembalikan!`,
       icon: "warning",
       showCancelButton: true,
@@ -609,7 +642,7 @@ export default function PatientDataTable({
 
       if (formMode === "add") {
         await addMutation.mutateAsync(
-          payload as unknown as Omit<PatientData, "id">
+          payload as unknown as Omit<PatientData, "id">,
         );
 
         Swal.close();
@@ -864,82 +897,309 @@ export default function PatientDataTable({
         <Box sx={{ overflowX: "auto", width: "100%" }}>
           <Table sx={{ minWidth: 650 }} size="small">
             <TableHead>
+              {/* Row 1: Main Headers + Rujukan Category Headers */}
               <TableRow>
                 <TableCell
                   width={50}
+                  rowSpan={2}
                   sx={{
                     fontWeight: 700,
                     color: "black",
                     py: 2,
-                    backgroundColor: "#F1F5F9", // Updated Color
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
                   }}
                 >
                   NO
                 </TableCell>
-                {effectiveColumns.map((column) => {
-                  const isSortable = !NON_SORTABLE_COLUMNS.includes(column);
-                  const columnWidth = getColumnWidth(column);
-                  const columnAlign = getColumnAlign();
+                {effectiveColumns
+                  .filter(
+                    (col) =>
+                      !col.startsWith("RUJUK_") &&
+                      !col.startsWith("PTM_") &&
+                      !col.startsWith("DIRUJUK_"),
+                  )
+                  .map((column) => {
+                    const isSortable = !NON_SORTABLE_COLUMNS.includes(column);
+                    const columnWidth = getColumnWidth(column);
+                    const columnAlign = getColumnAlign();
 
-                  return (
-                    <TableCell
-                      key={column}
-                      width={columnWidth}
-                      align={columnAlign}
-                      sx={{
-                        fontWeight: 700,
-                        color: "black",
-                        whiteSpace: "nowrap",
-                        py: 2,
-                        backgroundColor: "#F1F5F9",
-                        minWidth: columnWidth,
-                      }}
-                    >
-                      {isSortable ? (
-                        <TableSortLabel
-                          active={true}
-                          direction={
-                            sortColumn === column ? sortDirection : "asc"
-                          }
-                          onClick={() => handleSort(column)}
-                          IconComponent={ArrowDownwardIcon}
-                          sx={{
-                            color: "black !important",
-                            "& .MuiTableSortLabel-icon": {
-                              opacity: sortColumn === column ? 1 : 0.3,
-                              transition: "opacity 0.2s",
+                    return (
+                      <TableCell
+                        key={column}
+                        width={columnWidth}
+                        align={columnAlign}
+                        rowSpan={2}
+                        sx={{
+                          fontWeight: 700,
+                          color: "black",
+                          whiteSpace: "nowrap",
+                          py: 2,
+                          backgroundColor: "#F1F5F9",
+                          minWidth: columnWidth,
+                          borderBottom: "1px solid #ddd",
+                          fontSize: "12.75px",
+                        }}
+                      >
+                        {isSortable ? (
+                          <TableSortLabel
+                            active={true}
+                            direction={
+                              sortColumn === column ? sortDirection : "asc"
+                            }
+                            onClick={() => handleSort(column)}
+                            IconComponent={ArrowDownwardIcon}
+                            sx={{
                               color: "black !important",
-                            },
-                            "&:hover .MuiTableSortLabel-icon": {
-                              opacity: 1,
-                            },
-                            "&.Mui-active": {
-                              color: "black",
-                            },
-                          }}
-                        >
-                          {column}
-                        </TableSortLabel>
-                      ) : (
-                        column
-                      )}
-                    </TableCell>
-                  );
-                })}
+                              "& .MuiTableSortLabel-icon": {
+                                opacity: sortColumn === column ? 1 : 0.3,
+                                transition: "opacity 0.2s",
+                                color: "black !important",
+                              },
+                              "&:hover .MuiTableSortLabel-icon": {
+                                opacity: 1,
+                              },
+                              "&.Mui-active": {
+                                color: "black",
+                              },
+                            }}
+                          >
+                            {column}
+                          </TableSortLabel>
+                        ) : (
+                          column
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                {/* Rujukan Grouped Headers (Row 1 - Category) */}
+                <TableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    fontWeight: 700,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  RUJUK FASKES PERTAMA
+                </TableCell>
+                <TableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    fontWeight: 700,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  RUJUK KE FKRTL
+                </TableCell>
+                <TableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    fontWeight: 700,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PTM DIRUJUK KE FKRTL
+                </TableCell>
+                <TableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    fontWeight: 700,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  DIRUJUK BALIK DARI PUSKESMAS
+                </TableCell>
+                <TableCell
+                  align="center"
+                  colSpan={2}
+                  sx={{
+                    fontWeight: 700,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  DIRUJUK BALIK DARI FKRTL
+                </TableCell>
                 {(canEdit || canDelete) && (
                   <TableCell
                     width={120}
                     align="center"
+                    rowSpan={2}
                     sx={{
                       fontWeight: 700,
                       color: "black",
                       py: 2,
-                      backgroundColor: "#F1F5F9", // Updated Color
+                      backgroundColor: "#F1F5F9",
+                      borderBottom: "1px solid #ddd",
+                      fontSize: "12.75px",
                     }}
                   >
                     AKSI
                   </TableCell>
                 )}
+              </TableRow>
+
+              {/* Row 2: PB / PL Sub-headers */}
+              <TableRow>
+                {/* First: Rujuk Faskes Pertama PB/PL */}
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  PB
+                </TableCell>
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  PL
+                </TableCell>
+                {/* Second: Rujuk FKRTL PB/PL */}
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PB
+                </TableCell>
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PL
+                </TableCell>
+                {/* Third: PTM FKRTL PB/PL */}
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PB
+                </TableCell>
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PL
+                </TableCell>
+                {/* Fourth: Dirujuk Balik Puskesmas PB/PL */}
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PB
+                </TableCell>
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PL
+                </TableCell>
+                {/* Fifth: Dirujuk Balik FKRTL PB/PL */}
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PB
+                </TableCell>
+                <TableCell
+                  align="center"
+                  width={70}
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    py: 1,
+                    backgroundColor: "#F1F5F9",
+                    fontSize: "12.75px",
+                  }}
+                >
+                  PL
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -972,7 +1232,13 @@ export default function PatientDataTable({
                     hover
                     sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                   >
-                    <TableCell sx={{ color: "black" }}>
+                    <TableCell
+                      sx={{
+                        color: "black",
+                        fontSize: "12.75px",
+                        fontWeight: 700,
+                      }}
+                    >
                       {page * rowsPerPage + index + 1}
                     </TableCell>
                     {effectiveColumns.map((column) => {
@@ -1009,6 +1275,8 @@ export default function PatientDataTable({
                               ? "break-word"
                               : "normal",
                             overflow: "hidden",
+                            fontSize: "12.75px",
+                            fontWeight: column === "NAMA" ? 700 : 400,
                           }}
                         >
                           {String(cellValue)}
@@ -1074,7 +1342,7 @@ export default function PatientDataTable({
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
+          rowsPerPageOptions={[10, 25, 50, 100, 200, 500]}
           labelRowsPerPage="Baris per halaman:"
           labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} dari ${count}`

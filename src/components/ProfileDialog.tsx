@@ -77,7 +77,16 @@ export default function ProfileDialog({
       }
 
       // Payload Construction
-      const payload: any = {
+      interface PayloadType {
+        username: string;
+        action: string;
+        fullName?: string;
+        newUsername?: string;
+        oldPassword?: string;
+        newPassword?: string;
+      }
+
+      const payload: PayloadType = {
         username: userData.username, // Username lama untuk identifikasi
         action: activeTab === "password" ? "updatePassword" : "updateProfile",
       };
@@ -102,14 +111,14 @@ export default function ProfileDialog({
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       const result = await response.json();
 
       if (result.success) {
         setSuccess(
-          "Berhasil diperbarui! Silakan login ulang untuk melihat perubahan."
+          "Berhasil diperbarui! Silakan login ulang untuk melihat perubahan.",
         );
         if (activeTab === "password") {
           setOldPassword("");
@@ -327,7 +336,7 @@ export default function ProfileDialog({
           onClick={onClose}
           sx={{
             borderRadius: 2,
-            color: "text.secondary",
+            color: "text.primary",
             fontWeight: 600,
             px: 3,
           }}
@@ -347,7 +356,7 @@ export default function ProfileDialog({
             background: "linear-gradient(135deg, #696cff 0%, #8592ff 100%)",
           }}
           startIcon={
-            loading ? <CircularProgress size={20} color="inherit" /> : null
+            loading ? <CircularProgress size={20} color="primary" /> : null
           }
         >
           {loading ? "Menyimpan..." : "Simpan Perubahan"}

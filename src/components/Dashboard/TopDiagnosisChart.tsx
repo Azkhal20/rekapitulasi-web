@@ -51,20 +51,18 @@ const getCurrentMonthName = () => {
 
 interface TopDiagnosisChartProps {
   poliType: PoliType;
+  targetMonth: string;
+  targetYear: string;
 }
 
 export default function TopDiagnosisChart({
   poliType,
+  targetMonth,
+  targetYear,
 }: TopDiagnosisChartProps) {
-  // Default to current month dynamically
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName());
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString()
-  );
-
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<{ name: string; count: number }[]>(
-    []
+    [],
   );
   const [genderStats, setGenderStats] = useState({ L: 0, P: 0 });
 
@@ -91,10 +89,10 @@ export default function TopDiagnosisChart({
       try {
         setLoading(true);
         // Fetch ALL data for the month + year
-        const sheetName = `${selectedMonth} ${selectedYear}`;
+        const sheetName = `${targetMonth} ${targetYear}`;
         const patients = await patientService.getAllPatients(
           sheetName,
-          poliType
+          poliType,
         );
 
         // 1. Aggregate Diagnosis
@@ -135,7 +133,7 @@ export default function TopDiagnosisChart({
     };
 
     fetchData();
-  }, [selectedMonth, selectedYear, poliType]);
+  }, [targetMonth, targetYear, poliType]);
 
   // Custom Tooltip for Bar Chart
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,62 +187,11 @@ export default function TopDiagnosisChart({
             color="text.secondary"
             sx={{ fontWeight: 500 }}
           >
-            Statistik Poli {poliType.toUpperCase()} — {selectedMonth}{" "}
-            {selectedYear}
+            Statistik Poli {poliType.toUpperCase()} — {targetMonth} {targetYear}
           </Typography>
         </Box>
 
-        <Box display="flex" gap={2}>
-          <FormControl size="small" sx={{ minWidth: 100 }}>
-            <Select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              sx={{
-                borderRadius: "10px",
-                bgcolor: "#F1F5F9",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#E2E8F0",
-                },
-                fontWeight: 600,
-                fontSize: "0.875rem",
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "primary.main",
-                },
-              }}
-            >
-              {YEARS.map((year) => (
-                <MenuItem key={year} value={year} sx={{ fontWeight: 500 }}>
-                  {year}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <Select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              sx={{
-                borderRadius: "10px",
-                bgcolor: "#F1F5F9",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#E2E8F0",
-                },
-                fontWeight: 600,
-                fontSize: "0.875rem",
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "primary.main",
-                },
-              }}
-            >
-              {MONTHS.map((month) => (
-                <MenuItem key={month} value={month} sx={{ fontWeight: 500 }}>
-                  {month}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
+        {/* Removed month/year selection as it's now controlled by props */}
       </Box>
 
       {loading ? (
@@ -365,7 +312,12 @@ export default function TopDiagnosisChart({
             >
               {/* Laki-laki Progress Group */}
               <Box>
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  mb={1.5}
+                >
                   <Box display="flex" alignItems="center" gap={1.5}>
                     <Box
                       sx={{
@@ -417,7 +369,12 @@ export default function TopDiagnosisChart({
 
               {/* Perempuan Progress Group */}
               <Box>
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  mb={1.5}
+                >
                   <Box display="flex" alignItems="center" gap={1.5}>
                     <Box
                       sx={{
@@ -437,7 +394,7 @@ export default function TopDiagnosisChart({
                       Perempuan
                     </Typography>
                   </Box>
-                  <Typography variant="body2"  fontWeight="800" color="#EC4899">
+                  <Typography variant="body2" fontWeight="800" color="#EC4899">
                     {genderStats.P}
                   </Typography>
                 </Box>
