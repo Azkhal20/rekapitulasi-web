@@ -42,7 +42,8 @@ const formatDateForSheet = (isoDate: string): string => {
       month: "short",
       year: "numeric",
     });
-  } catch (_) {
+  } catch {
+    // Ignore parsing errors
     return isoDate;
   }
 };
@@ -95,7 +96,7 @@ const parseDateFromSheet = (displayDate: string): string => {
       // Partial match fallback (e.g. "Febr")
       if (!month) {
         const key = Object.keys(MONTH_MAP).find(
-          (k) => k.startsWith(monthStr) || monthStr.startsWith(k)
+          (k) => k.startsWith(monthStr) || monthStr.startsWith(k),
         );
         if (key) month = MONTH_MAP[key];
       }
@@ -106,7 +107,7 @@ const parseDateFromSheet = (displayDate: string): string => {
     // Fallback JS Date parser
     const date = new Date(cleanDate);
     if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
-  } catch (_) {
+  } catch {
     console.warn("Failed to parse date:", cleanDate);
   }
   return "";
@@ -142,6 +143,17 @@ export default function PatientFormDialog({
     ICD10: "",
     TINDAKAN: "",
     OBAT: "",
+    // Referral fields
+    RUJUK_FASKES_PERTAMA_PB: "",
+    RUJUK_FASKES_PERTAMA_PL: "",
+    RUJUK_FKRTL_PB: "",
+    RUJUK_FKRTL_PL: "",
+    PTM_RUJUK_FKRTL_PB: "",
+    PTM_RUJUK_FKRTL_PL: "",
+    DIRUJUK_BALIK_PUSKESMAS_PB: "",
+    DIRUJUK_BALIK_PUSKESMAS_PL: "",
+    DIRUJUK_BALIK_FKRTL_PB: "",
+    DIRUJUK_BALIK_FKRTL_PL: "",
   });
 
   // Effect: Auto Calculate HARI, BULAN, and 16-15 when TANGGAL changes (Only in ADD mode)
@@ -170,7 +182,7 @@ export default function PatientFormDialog({
         let nextHari = 1;
         if (recordsSameDay.length > 0) {
           const maxHari = Math.max(
-            ...recordsSameDay.map((r) => parseInt(String(r.HARI || "0")) || 0)
+            ...recordsSameDay.map((r) => parseInt(String(r.HARI || "0")) || 0),
           );
           nextHari = maxHari + 1;
         }
@@ -187,8 +199,8 @@ export default function PatientFormDialog({
         if (recordsSameMonth.length > 0) {
           const maxBulan = Math.max(
             ...recordsSameMonth.map(
-              (r) => parseInt(String(r.BULAN || "0")) || 0
-            )
+              (r) => parseInt(String(r.BULAN || "0")) || 0,
+            ),
           );
           nextBulan = maxBulan + 1;
         }
@@ -225,7 +237,7 @@ export default function PatientFormDialog({
               const rawVal = r["16-15"] || r.ENAM_BELAS_LIMA_BELAS || "0";
               const val = parseInt(String(rawVal));
               return isNaN(val) ? 0 : val;
-            })
+            }),
           );
           next1615 = maxVal + 1;
         } else {
@@ -279,6 +291,17 @@ export default function PatientFormDialog({
           ICD10: "",
           TINDAKAN: "",
           OBAT: "",
+          // Referral fields
+          RUJUK_FASKES_PERTAMA_PB: "",
+          RUJUK_FASKES_PERTAMA_PL: "",
+          RUJUK_FKRTL_PB: "",
+          RUJUK_FKRTL_PL: "",
+          PTM_RUJUK_FKRTL_PB: "",
+          PTM_RUJUK_FKRTL_PL: "",
+          DIRUJUK_BALIK_PUSKESMAS_PB: "",
+          DIRUJUK_BALIK_PUSKESMAS_PL: "",
+          DIRUJUK_BALIK_FKRTL_PB: "",
+          DIRUJUK_BALIK_FKRTL_PL: "",
         });
       }
       setError(null);
@@ -287,7 +310,7 @@ export default function PatientFormDialog({
 
   const handleChange = (
     field: keyof Omit<PatientData, "id">,
-    value: string
+    value: string,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -546,6 +569,152 @@ export default function PatientFormDialog({
               rows={2}
               sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
             />
+
+            {/* Data Rujukan Section */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" }, mt: 1 }}>
+              <Typography
+                variant="subtitle1"
+                color="primary"
+                sx={{ mb: 2, fontWeight: 700 }}
+              >
+                DATA RUJUKAN
+              </Typography>
+            </Box>
+
+            {/* Rujuk Faskes Pertama */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                Rujuk FASKES Pertama
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="PB (Pasien Baru)"
+                  value={formData.RUJUK_FASKES_PERTAMA_PB || ""}
+                  onChange={(e) =>
+                    handleChange("RUJUK_FASKES_PERTAMA_PB", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+                <TextField
+                  label="PL (Pasien Lama)"
+                  value={formData.RUJUK_FASKES_PERTAMA_PL || ""}
+                  onChange={(e) =>
+                    handleChange("RUJUK_FASKES_PERTAMA_PL", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+              </Stack>
+            </Box>
+
+            {/* Rujuk ke FKRTL */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                Rujuk ke FKRTL (Rumah Sakit)
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="PB (Pasien Baru)"
+                  value={formData.RUJUK_FKRTL_PB || ""}
+                  onChange={(e) =>
+                    handleChange("RUJUK_FKRTL_PB", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+                <TextField
+                  label="PL (Pasien Lama)"
+                  value={formData.RUJUK_FKRTL_PL || ""}
+                  onChange={(e) =>
+                    handleChange("RUJUK_FKRTL_PL", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+              </Stack>
+            </Box>
+
+            {/* PTM Dirujuk ke FKRTL */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                PTM Dirujuk ke FKRTL
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="PB (Pasien Baru)"
+                  value={formData.PTM_RUJUK_FKRTL_PB || ""}
+                  onChange={(e) =>
+                    handleChange("PTM_RUJUK_FKRTL_PB", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+                <TextField
+                  label="PL (Pasien Lama)"
+                  value={formData.PTM_RUJUK_FKRTL_PL || ""}
+                  onChange={(e) =>
+                    handleChange("PTM_RUJUK_FKRTL_PL", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+              </Stack>
+            </Box>
+
+            {/* Dirujuk Balik dari Puskesmas */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                Dirujuk Balik dari Puskesmas
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="PB (Pasien Baru)"
+                  value={formData.DIRUJUK_BALIK_PUSKESMAS_PB || ""}
+                  onChange={(e) =>
+                    handleChange("DIRUJUK_BALIK_PUSKESMAS_PB", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+                <TextField
+                  label="PL (Pasien Lama)"
+                  value={formData.DIRUJUK_BALIK_PUSKESMAS_PL || ""}
+                  onChange={(e) =>
+                    handleChange("DIRUJUK_BALIK_PUSKESMAS_PL", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+              </Stack>
+            </Box>
+
+            {/* Dirujuk Balik dari FKRTL */}
+            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                Dirujuk Balik dari FKRTL
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="PB (Pasien Baru)"
+                  value={formData.DIRUJUK_BALIK_FKRTL_PB || ""}
+                  onChange={(e) =>
+                    handleChange("DIRUJUK_BALIK_FKRTL_PB", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+                <TextField
+                  label="PL (Pasien Lama)"
+                  value={formData.DIRUJUK_BALIK_FKRTL_PL || ""}
+                  onChange={(e) =>
+                    handleChange("DIRUJUK_BALIK_FKRTL_PL", e.target.value)
+                  }
+                  fullWidth
+                  placeholder="0"
+                />
+              </Stack>
+            </Box>
           </Box>
         </DialogContent>
 

@@ -16,6 +16,17 @@ export interface PatientData {
   ICD10: string;
   TINDAKAN: string;
   OBAT: string;
+  // Kolom Rujukan (Q-Z)
+  RUJUK_FASKES_PERTAMA_PB?: string;
+  RUJUK_FASKES_PERTAMA_PL?: string;
+  RUJUK_FKRTL_PB?: string;
+  RUJUK_FKRTL_PL?: string;
+  PTM_RUJUK_FKRTL_PB?: string;
+  PTM_RUJUK_FKRTL_PL?: string;
+  DIRUJUK_BALIK_PUSKESMAS_PB?: string;
+  DIRUJUK_BALIK_PUSKESMAS_PL?: string;
+  DIRUJUK_BALIK_FKRTL_PB?: string;
+  DIRUJUK_BALIK_FKRTL_PL?: string;
 }
 
 export type PoliType = 'umum' | 'gigi';

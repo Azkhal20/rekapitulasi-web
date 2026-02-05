@@ -21,6 +21,7 @@ import {
   PeopleAlt as PeopleIcon,
   MedicalServices as MedicalServicesIcon,
 } from "@mui/icons-material";
+
 import {
   patientService,
   PatientData,
@@ -209,7 +210,7 @@ export default function ReportsPage() {
   };
 
   const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
@@ -217,6 +218,8 @@ export default function ReportsPage() {
 
   // Load selected poli dan period dari localStorage atau set default saat mount
   useEffect(() => {
+    if (typeof window === "undefined") return; // Skip during SSR
+
     // 1. Load Poli
     const savedPoli = localStorage.getItem("reports_selected_poli");
     if (savedPoli && (savedPoli === "umum" || savedPoli === "gigi")) {
@@ -230,7 +233,7 @@ export default function ReportsPage() {
     } else {
       const today = new Date();
       const currentPeriod = periods.find(
-        (p) => today >= p.startDate && today <= p.endDate
+        (p) => today >= p.startDate && today <= p.endDate,
       );
       if (currentPeriod) {
         setSelectedPeriodLabel(currentPeriod.label);
@@ -243,14 +246,14 @@ export default function ReportsPage() {
 
   // Save selectedPoli ke localStorage
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded && typeof window !== "undefined") {
       localStorage.setItem("reports_selected_poli", selectedPoli);
     }
   }, [selectedPoli, isLoaded]);
 
   // Save selected period ke localStorage
   useEffect(() => {
-    if (isLoaded && selectedPeriodLabel) {
+    if (isLoaded && selectedPeriodLabel && typeof window !== "undefined") {
       localStorage.setItem("reports_selected_period", selectedPeriodLabel);
     }
   }, [selectedPeriodLabel, isLoaded]);
@@ -276,10 +279,10 @@ export default function ReportsPage() {
             .catch((err) => {
               console.warn(
                 `Sheet ${sheetName} tidak ditemukan atau error:`,
-                err
+                err,
               );
               return [] as PatientData[]; // Return kosong jika gagal
-            })
+            }),
         );
 
         const results = await Promise.all(promises);
@@ -304,17 +307,17 @@ export default function ReportsPage() {
           const check = new Date(
             pDate.getFullYear(),
             pDate.getMonth(),
-            pDate.getDate()
+            pDate.getDate(),
           );
           const start = new Date(
             period.startDate.getFullYear(),
             period.startDate.getMonth(),
-            period.startDate.getDate()
+            period.startDate.getDate(),
           );
           const end = new Date(
             period.endDate.getFullYear(),
             period.endDate.getMonth(),
-            period.endDate.getDate()
+            period.endDate.getDate(),
           );
 
           return check >= start && check <= end;
@@ -322,14 +325,14 @@ export default function ReportsPage() {
 
         filtered.sort(
           (a, b) =>
-            new Date(a.TANGGAL).getTime() - new Date(b.TANGGAL).getTime()
+            new Date(a.TANGGAL).getTime() - new Date(b.TANGGAL).getTime(),
         );
 
         setReportData(filtered);
       } catch (err) {
         console.error("Error generating report:", err);
         setError(
-          "Gagal mengambil data laporan. Pastikan koneksi internet lancar."
+          "Gagal mengambil data laporan. Pastikan koneksi internet lancar.",
         );
       } finally {
         setLoading(false);
@@ -365,7 +368,7 @@ export default function ReportsPage() {
 
   const paginatedData = filteredReportData.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (
@@ -555,7 +558,7 @@ export default function ReportsPage() {
                       (p) =>
                         p.L &&
                         String(p.L).trim() !== "" &&
-                        String(p.L).trim() !== "-"
+                        String(p.L).trim() !== "-",
                     ).length}
               </Typography>
             </CardContent>
@@ -599,7 +602,7 @@ export default function ReportsPage() {
                       (p) =>
                         p.P &&
                         String(p.P).trim() !== "" &&
-                        String(p.P).trim() !== "-"
+                        String(p.P).trim() !== "-",
                     ).length}
               </Typography>
             </CardContent>
@@ -725,7 +728,7 @@ export default function ReportsPage() {
                   paginatedData.map((row, index) => (
                     <tr
                       key={index}
-                      style={{ borderBottom: "1px solid #F8FAFC" }}
+                      style={{ borderBottom: "2px solid #E2E8F0" }}
                     >
                       <td
                         style={{
