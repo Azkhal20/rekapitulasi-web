@@ -79,8 +79,10 @@ export default function DashboardPage() {
   });
 
   const [serverTime, setServerTime] = useState<string>("");
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     // Set initial time only on client
     setServerTime(
       new Date().toLocaleTimeString("id-ID", {
@@ -568,6 +570,10 @@ export default function DashboardPage() {
       trendBg: "rgba(99, 102, 241, 0.15)",
     },
   ];
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <Box sx={{ pb: 4 }}>
