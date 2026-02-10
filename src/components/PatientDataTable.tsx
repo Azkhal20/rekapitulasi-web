@@ -24,14 +24,17 @@ import {
   Button,
   Typography,
   Tooltip,
+  Checkbox,
+  Fade,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
 import HistoryIcon from "@mui/icons-material/History";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import CheckboxIcon from "@mui/icons-material/CheckBox";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
 import { PatientData, PoliType } from "@/services/patientService";
@@ -111,12 +114,11 @@ export default function PatientDataTable({
   const [selectedPatient, setSelectedPatient] = useState<PatientData | null>(
     null,
   );
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // React Query Mutations
-  const { addMutation, updateMutation, deleteMutation } = usePatientMutations(
-    sheetName,
-    poliType,
-  );
+  const { addMutation, updateMutation, deleteBulkMutation } =
+    usePatientMutations(sheetName, poliType);
 
   const [nextTahun, setNextTahun] = useState<string>("1");
 
@@ -138,6 +140,8 @@ export default function PatientDataTable({
       "16-15",
       "L",
       "P",
+      "BARU",
+      "LAMA",
       "NAMA",
       "USIA",
       "NIP",
@@ -271,6 +275,8 @@ export default function PatientDataTable({
       "16-15": 70,
       L: 55,
       P: 55,
+      BARU: 75,
+      LAMA: 75,
       USIA: 70,
 
       // Kolom sedang
@@ -430,6 +436,70 @@ export default function PatientDataTable({
     setPage(0);
   };
 
+  // Selection Logic
+  const handleToggleRow = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const handleToggleAll = () => {
+    if (selectedIds.length === filteredAndSortedData.length) {
+      setSelectedIds([]);
+    } else {
+      const allIds = filteredAndSortedData.map(
+        (row) => (row as PatientData).id || 0,
+      );
+      setSelectedIds(allIds);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+
+    MySwal.fire({
+      title: "Hapus Data?",
+      text: `Anda akan menghapus ${selectedIds.length} data pasien sekaligus. Tindakan ini tidak dapat dibatalkan!`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#FF4C51",
+      cancelButtonColor: "#8592A3",
+      confirmButtonText: "Ya, Hapus Semua!",
+      cancelButtonText: "Batal",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          MySwal.fire({
+            title: "Menghapus...",
+            text: `Sedang menghapus ${selectedIds.length} data`,
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          await deleteBulkMutation.mutateAsync(selectedIds);
+
+          Swal.close();
+          Toast.fire({
+            icon: "success",
+            title: `${selectedIds.length} data pasien berhasil dihapus`,
+          });
+
+          setSelectedIds([]);
+          if (onDataChange) onDataChange();
+        } catch (error) {
+          console.error("Bulk delete error:", error);
+          Swal.close();
+          Toast.fire({
+            icon: "error",
+            title: "Gagal menghapus data secara masal",
+          });
+        }
+      }
+    });
+  };
+
   // Handler CRUD
   const handleAddPatient = () => {
     // LOGIKA: Ambil nomor urut terakhir + 1
@@ -507,6 +577,8 @@ export default function PatientDataTable({
       ),
       L: String(p.L || ""),
       P: String(p.P || ""),
+      BARU: String(p.BARU || ""),
+      LAMA: String(p.LAMA || ""),
       NAMA: String(p.NAMA || ""),
       USIA: String(p.USIA || ""),
       NIP: String(p.NIP || ""),
@@ -532,55 +604,6 @@ export default function PatientDataTable({
 
     setSelectedPatient(patientData);
     setFormDialogOpen(true);
-  };
-
-  const handleDeleteClick = (patient: Patient | PatientData) => {
-    const p = patient as Record<string, unknown>;
-
-    MySwal.fire({
-      title: "Apakah Anda yakin?",
-      text: `Anda akan menghapus data pasien ${String(
-        p.NAMA || "ini",
-      )}. Data tidak dapat dikembalikan!`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#FF4C51",
-      cancelButtonColor: "#8592A3",
-      confirmButtonText: "Ya, Hapus!",
-      cancelButtonText: "Batal",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          MySwal.fire({
-            title: "Menghapus...",
-            text: "Mohon tunggu sebentar",
-            allowOutsideClick: false,
-            didOpen: () => {
-              Swal.showLoading();
-            },
-          });
-
-          await deleteMutation.mutateAsync(p.id as number);
-
-          Swal.close();
-          Toast.fire({
-            icon: "success",
-            title: "Data pasien berhasil dihapus",
-          });
-
-          if (onDataChange) {
-            onDataChange();
-          }
-        } catch (error) {
-          console.error("Error deleting patient:", error);
-          Swal.close();
-          Toast.fire({
-            icon: "error",
-            title: "Gagal menghapus data pasien",
-          });
-        }
-      }
-    });
   };
 
   const handleFormSubmit = async (formData: Omit<PatientData, "id">) => {
@@ -897,8 +920,30 @@ export default function PatientDataTable({
         <Box sx={{ overflowX: "auto", width: "100%" }}>
           <Table sx={{ minWidth: 650 }} size="small">
             <TableHead>
-              {/* Row 1: Main Headers + Rujukan Category Headers */}
+              {/* Row 1: Main Headers + Checkbox */}
               <TableRow>
+                <TableCell
+                  width={40}
+                  rowSpan={2}
+                  padding="checkbox"
+                  sx={{
+                    backgroundColor: "#F1F5F9",
+                    borderBottom: "1px solid #ddd",
+                  }}
+                >
+                  <Checkbox
+                    indeterminate={
+                      selectedIds.length > 0 &&
+                      selectedIds.length < filteredAndSortedData.length
+                    }
+                    checked={
+                      filteredAndSortedData.length > 0 &&
+                      selectedIds.length === filteredAndSortedData.length
+                    }
+                    onChange={handleToggleAll}
+                    sx={{ color: "#696CFF" }}
+                  />
+                </TableCell>
                 <TableCell
                   width={50}
                   rowSpan={2}
@@ -1208,7 +1253,7 @@ export default function PatientDataTable({
                   <TableCell
                     colSpan={
                       effectiveColumns.length +
-                      1 +
+                      2 +
                       (canEdit || canDelete ? 1 : 0)
                     }
                     align="center"
@@ -1226,107 +1271,111 @@ export default function PatientDataTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedData.map((row, index) => (
-                  <TableRow
-                    key={String(getRowValue(row, "id")) || index}
-                    hover
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                  >
-                    <TableCell
+                paginatedData.map((row, index) => {
+                  const rowId = (row as PatientData).id || 0;
+                  const isSelected = selectedIds.includes(rowId);
+                  return (
+                    <TableRow
+                      key={rowId || index}
+                      hover
+                      selected={isSelected}
                       sx={{
-                        color: "black",
-                        fontSize: "12.75px",
-                        fontWeight: 700,
+                        "&:last-child td, &:last-child th": { border: 0 },
+                        backgroundColor: isSelected
+                          ? "rgba(105, 108, 255, 0.04) !important"
+                          : "inherit",
                       }}
                     >
-                      {page * rowsPerPage + index + 1}
-                    </TableCell>
-                    {effectiveColumns.map((column) => {
-                      let cellValue = getRowValue(row, column) || "-";
-                      const columnWidth = getColumnWidth(column);
-                      const columnAlign = getColumnAlign();
-
-                      if (column === "TANGGAL" && cellValue !== "-") {
-                        cellValue = formatDate(String(cellValue));
-                      }
-
-                      // Kolom dengan teks panjang yang perlu word wrap
-                      const isLongTextColumn = [
-                        "OBS TTV",
-                        "KELUHAN",
-                        "DIAGNOSIS",
-                        "TINDAKAN",
-                        "TINDAKAN ",
-                        "OBAT",
-                        "NAMA",
-                      ].includes(column);
-
-                      return (
-                        <TableCell
-                          key={column}
-                          align={columnAlign}
-                          sx={{
-                            color: "black",
-                            py: 1.5,
-                            minWidth: columnWidth,
-                            maxWidth: columnWidth,
-                            whiteSpace: isLongTextColumn ? "normal" : "nowrap",
-                            wordWrap: isLongTextColumn
-                              ? "break-word"
-                              : "normal",
-                            overflow: "hidden",
-                            fontSize: "12.75px",
-                            fontWeight: column === "NAMA" ? 700 : 400,
-                          }}
-                        >
-                          {String(cellValue)}
-                        </TableCell>
-                      );
-                    })}
-                    {(canEdit || canDelete) && (
-                      <TableCell align="center" sx={{ py: 1.5 }}>
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="center"
-                        >
-                          {canEdit && (
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleEditPatient(row)}
-                                sx={{
-                                  color: "#696CFF",
-                                  "&:hover": {
-                                    backgroundColor: "rgba(105, 108, 255, 0.1)",
-                                  },
-                                }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {canDelete && (
-                            <Tooltip title="Hapus">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeleteClick(row)}
-                                sx={{
-                                  color: "#FF4C51",
-                                  "&:hover": {
-                                    backgroundColor: "rgba(255, 76, 81, 0.1)",
-                                  },
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => handleToggleRow(rowId)}
+                          sx={{ color: "#696CFF" }}
+                        />
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))
+                      <TableCell
+                        sx={{
+                          color: "black",
+                          fontSize: "12.75px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {page * rowsPerPage + index + 1}
+                      </TableCell>
+                      {effectiveColumns.map((column) => {
+                        let cellValue = getRowValue(row, column) || "-";
+                        const columnWidth = getColumnWidth(column);
+                        const columnAlign = getColumnAlign();
+
+                        if (column === "TANGGAL" && cellValue !== "-") {
+                          cellValue = formatDate(String(cellValue));
+                        }
+
+                        // Kolom dengan teks panjang yang perlu word wrap
+                        const isLongTextColumn = [
+                          "OBS TTV",
+                          "KELUHAN",
+                          "DIAGNOSIS",
+                          "TINDAKAN",
+                          "TINDAKAN ",
+                          "OBAT",
+                          "NAMA",
+                        ].includes(column);
+
+                        return (
+                          <TableCell
+                            key={column}
+                            align={columnAlign}
+                            sx={{
+                              color: "black",
+                              py: 1.5,
+                              minWidth: columnWidth,
+                              maxWidth: columnWidth,
+                              whiteSpace: isLongTextColumn
+                                ? "normal"
+                                : "nowrap",
+                              wordWrap: isLongTextColumn
+                                ? "break-word"
+                                : "normal",
+                              overflow: "hidden",
+                              fontSize: "12.75px",
+                              fontWeight: column === "NAMA" ? 700 : 400,
+                            }}
+                          >
+                            {String(cellValue)}
+                          </TableCell>
+                        );
+                      })}
+                      {(canEdit || canDelete) && (
+                        <TableCell align="center" sx={{ py: 1.5 }}>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="center"
+                          >
+                            {canEdit && (
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleEditPatient(row)}
+                                  sx={{
+                                    color: "#696CFF",
+                                    "&:hover": {
+                                      backgroundColor:
+                                        "rgba(105, 108, 255, 0.1)",
+                                    },
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -1361,6 +1410,71 @@ export default function PatientDataTable({
           }}
         />
       </Box>
+
+      {/* Floating Action Bar for Bulk Selection */}
+      <Fade in={selectedIds.length > 0}>
+        <Paper
+          elevation={10}
+          sx={{
+            position: "fixed",
+            bottom: 32,
+            left: "50%",
+            transform: "translateX(-50%)",
+            bgcolor: "#232333",
+            color: "white",
+            py: 1.5,
+            px: 3,
+            borderRadius: "50px",
+            display: "flex",
+            alignItems: "center",
+            gap: 3,
+            zIndex: 1300,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <CheckboxIcon sx={{ color: "#696CFF" }} />
+            <Typography variant="body2" fontWeight={700}>
+              {selectedIds.length} Data Terpilih
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              width: "1px",
+              height: "24px",
+              bgcolor: "rgba(255,255,255,0.2)",
+            }}
+          />
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              onClick={() => setSelectedIds([])}
+              sx={{ color: "#8592A3", fontWeight: 700 }}
+            >
+              Batal
+            </Button>
+            {canDelete && (
+              <Button
+                variant="contained"
+                color="error"
+                size="small"
+                startIcon={<DeleteSweepIcon />}
+                onClick={handleBulkDelete}
+                sx={{
+                  borderRadius: "20px",
+                  px: 2,
+                  fontWeight: 800,
+                  boxShadow: "0 4px 12px rgba(255, 76, 81, 0.4)",
+                  "&:hover": { backgroundColor: "#e54448" },
+                }}
+              >
+                Hapus Data
+              </Button>
+            )}
+          </Stack>
+        </Paper>
+      </Fade>
 
       <PatientFormDialog
         open={formDialogOpen}

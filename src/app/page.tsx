@@ -46,9 +46,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Check if already logged in
+  // Check if already logged in and handle mount
   useEffect(() => {
+    setIsMounted(true);
     // Import dynamically to avoid SSR issues
     import("@/lib/auth").then(({ isAuthenticated }) => {
       if (isAuthenticated()) {
@@ -56,6 +58,10 @@ export default function LoginPage() {
       }
     });
   }, [router]);
+
+  if (!isMounted) {
+    return null; // Or a basic loading state/skeleton
+  }
 
   // Validation Functions
   const validateLogin = (): boolean => {
@@ -119,7 +125,7 @@ export default function LoginPage() {
             username: loginUsername,
             password: loginPassword,
           }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -169,7 +175,7 @@ export default function LoginPage() {
             role: regRole,
             fullName: regFullName,
           }),
-        }
+        },
       );
 
       const data = await response.json();
