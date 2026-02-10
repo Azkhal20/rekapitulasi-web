@@ -19,6 +19,8 @@ export const PatientSchema = z.object({
   ENAM_BELAS_LIMA_BELAS: z.string().optional().or(z.null()), // 16-15
   L: numericString, // Usia L
   P: numericString, // Usia P
+  BARU: numericString, // Pasien Baru
+  LAMA: numericString, // Pasien Lama
   NAMA: z.string().min(1, "Nama pasien wajib diisi"),
   USIA: z.string().optional(), // Often calculated or just a string
   NIP: z.string().optional(),

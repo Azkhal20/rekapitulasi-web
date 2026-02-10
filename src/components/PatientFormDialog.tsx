@@ -14,8 +14,14 @@ import {
   CircularProgress,
   Alert,
   Typography,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import EditNoteIcon from "@mui/icons-material/EditNote";
+import SendIcon from "@mui/icons-material/Send";
 import { PatientData } from "@/services/patientService";
 import { Patient } from "@/types/patient";
 
@@ -113,6 +119,40 @@ const parseDateFromSheet = (displayDate: string): string => {
   return "";
 };
 
+const REFERRAL_CATEGORIES = [
+  { label: "Tidak Ada Rujukan", value: "none" },
+  {
+    label: "Rujuk FASKES Pertama",
+    value: "RUJUK_FASKES_PERTAMA",
+    pb: "RUJUK_FASKES_PERTAMA_PB",
+    pl: "RUJUK_FASKES_PERTAMA_PL",
+  },
+  {
+    label: "Rujuk ke FKRTL (Rumah Sakit)",
+    value: "RUJUK_FKRTL",
+    pb: "RUJUK_FKRTL_PB",
+    pl: "RUJUK_FKRTL_PL",
+  },
+  {
+    label: "PTM Dirujuk ke FKRTL",
+    value: "PTM_RUJUK_FKRTL",
+    pb: "PTM_RUJUK_FKRTL_PB",
+    pl: "PTM_RUJUK_FKRTL_PL",
+  },
+  {
+    label: "Dirujuk Balik dari Puskesmas",
+    value: "DIRUJUK_BALIK_PUSKESMAS",
+    pb: "DIRUJUK_BALIK_PUSKESMAS_PB",
+    pl: "DIRUJUK_BALIK_PUSKESMAS_PL",
+  },
+  {
+    label: "Dirujuk Balik dari FKRTL",
+    value: "DIRUJUK_BALIK_FKRTL",
+    pb: "DIRUJUK_BALIK_FKRTL_PB",
+    pl: "DIRUJUK_BALIK_FKRTL_PL",
+  },
+];
+
 export default function PatientFormDialog({
   open,
   onClose,
@@ -126,6 +166,8 @@ export default function PatientFormDialog({
 }: PatientFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeReferralType, setActiveReferralType] = useState<string>("none");
+
   const [formData, setFormData] = useState<Omit<PatientData, "id">>({
     TANGGAL: "",
     TAHUN: "",
@@ -134,6 +176,8 @@ export default function PatientFormDialog({
     ENAM_BELAS_LIMA_BELAS: "",
     L: "",
     P: "",
+    BARU: "",
+    LAMA: "",
     NAMA: "",
     USIA: "",
     NIP: "",
@@ -267,13 +311,28 @@ export default function PatientFormDialog({
         if (convertedData.TANGGAL) {
           convertedData.TANGGAL = parseDateFromSheet(convertedData.TANGGAL);
         }
-        setFormData(convertedData);
+
+        // Detect active referral type for dropdown
+        const found = REFERRAL_CATEGORIES.find(
+          (cat) =>
+            cat.value !== "none" &&
+            (String(initialData[cat.pb as keyof PatientData] || "") ||
+              String(initialData[cat.pl as keyof PatientData] || "")),
+        );
+        setActiveReferralType(found ? found.value : "none");
+
+        setFormData({
+          ...convertedData,
+          BARU: String(initialData.BARU || ""),
+          LAMA: String(initialData.LAMA || ""),
+        });
       } else {
         // ADD Mode
         const now = new Date();
         const tanggal = now.toISOString().split("T")[0];
         const tahun = defaultTahun || now.getFullYear().toString();
 
+        setActiveReferralType("none");
         setFormData({
           TANGGAL: tanggal,
           TAHUN: tahun,
@@ -282,6 +341,8 @@ export default function PatientFormDialog({
           ENAM_BELAS_LIMA_BELAS: "", // Auto-calc will fill this
           L: "",
           P: "",
+          BARU: "",
+          LAMA: "",
           NAMA: "",
           USIA: "",
           NIP: "",
@@ -302,6 +363,8 @@ export default function PatientFormDialog({
           DIRUJUK_BALIK_PUSKESMAS_PL: "",
           DIRUJUK_BALIK_FKRTL_PB: "",
           DIRUJUK_BALIK_FKRTL_PL: "",
+          BARU: "",
+          LAMA: "",
         });
       }
       setError(null);
@@ -313,6 +376,19 @@ export default function PatientFormDialog({
     value: string,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleReferralTypeChange = (newType: string) => {
+    setFormData((prev) => {
+      const updated = { ...prev } as Record<string, string>;
+      // Reset all referral fields using type-safe keys
+      REFERRAL_CATEGORIES.forEach((cat) => {
+        if (cat.pb) updated[cat.pb] = "";
+        if (cat.pl) updated[cat.pl] = "";
+      });
+      return updated as unknown as Omit<PatientData, "id">;
+    });
+    setActiveReferralType(newType);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -493,6 +569,25 @@ export default function PatientFormDialog({
               />
             </Stack>
 
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Baru (Pasien Baru)"
+                value={formData.BARU}
+                onChange={(e) => handleChange("BARU", e.target.value)}
+                fullWidth
+                placeholder="Isi 1 jika pasien baru"
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Lama (Pasien Lama)"
+                value={formData.LAMA}
+                onChange={(e) => handleChange("LAMA", e.target.value)}
+                fullWidth
+                placeholder="Isi 1 jika pasien lama"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+
             <TextField
               label="Usia"
               value={formData.USIA}
@@ -512,11 +607,28 @@ export default function PatientFormDialog({
               <Typography
                 variant="subtitle1"
                 color="primary"
-                sx={{ mb: 2, fontWeight: 700 }}
+                sx={{
+                  mb: 2,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
               >
-                DATA MEDIS
+                <EditNoteIcon /> DATA MEDIS
               </Typography>
             </Box>
+
+            <TextField
+              label="OBS TTV"
+              value={formData.OBS_TTV}
+              onChange={(e) => handleChange("OBS_TTV", e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+              placeholder="TD, Nadi, Suhu, RR, dll"
+              sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
+            />
 
             <TextField
               label="Keluhan"
@@ -541,6 +653,7 @@ export default function PatientFormDialog({
               value={formData.ICD10}
               onChange={(e) => handleChange("ICD10", e.target.value)}
               fullWidth
+              placeholder="Kode ICD-10"
             />
 
             <TextField
@@ -548,6 +661,7 @@ export default function PatientFormDialog({
               value={formData.TINDAKAN}
               onChange={(e) => handleChange("TINDAKAN", e.target.value)}
               fullWidth
+              placeholder="Terapi Medis / Tindakan"
             />
 
             <TextField
@@ -556,17 +670,8 @@ export default function PatientFormDialog({
               onChange={(e) => handleChange("OBAT", e.target.value)}
               fullWidth
               multiline
-              rows={2}
-              sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
-            />
-
-            <TextField
-              label="OBS TTV"
-              value={formData.OBS_TTV}
-              onChange={(e) => handleChange("OBS_TTV", e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
+              rows={3}
+              placeholder="Rincian obat yang diberikan"
               sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
             />
 
@@ -575,145 +680,119 @@ export default function PatientFormDialog({
               <Typography
                 variant="subtitle1"
                 color="primary"
-                sx={{ mb: 2, fontWeight: 700 }}
+                sx={{
+                  mb: 2,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
               >
-                DATA RUJUKAN
+                <SendIcon /> DATA RUJUKAN
               </Typography>
             </Box>
 
-            {/* Rujuk Faskes Pertama */}
             <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                Rujuk FASKES Pertama
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="PB (Pasien Baru)"
-                  value={formData.RUJUK_FASKES_PERTAMA_PB || ""}
-                  onChange={(e) =>
-                    handleChange("RUJUK_FASKES_PERTAMA_PB", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-                <TextField
-                  label="PL (Pasien Lama)"
-                  value={formData.RUJUK_FASKES_PERTAMA_PL || ""}
-                  onChange={(e) =>
-                    handleChange("RUJUK_FASKES_PERTAMA_PL", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-              </Stack>
-            </Box>
+              <FormControl fullWidth sx={{ mb: activeReferralType !== "none" ? 2 : 0 }}>
+                <InputLabel id="referral-type-label">Pilih Jenis Rujukan</InputLabel>
+                <Select
+                  labelId="referral-type-label"
+                  value={activeReferralType}
+                  label="Pilih Jenis Rujukan"
+                  onChange={(e) => handleReferralTypeChange(e.target.value)}
+                  sx={{ borderRadius: "12px" }}
+                >
+                  {REFERRAL_CATEGORIES.map((cat) => (
+                    <MenuItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            {/* Rujuk ke FKRTL */}
-            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                Rujuk ke FKRTL (Rumah Sakit)
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="PB (Pasien Baru)"
-                  value={formData.RUJUK_FKRTL_PB || ""}
-                  onChange={(e) =>
-                    handleChange("RUJUK_FKRTL_PB", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-                <TextField
-                  label="PL (Pasien Lama)"
-                  value={formData.RUJUK_FKRTL_PL || ""}
-                  onChange={(e) =>
-                    handleChange("RUJUK_FKRTL_PL", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-              </Stack>
-            </Box>
-
-            {/* PTM Dirujuk ke FKRTL */}
-            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                PTM Dirujuk ke FKRTL
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="PB (Pasien Baru)"
-                  value={formData.PTM_RUJUK_FKRTL_PB || ""}
-                  onChange={(e) =>
-                    handleChange("PTM_RUJUK_FKRTL_PB", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-                <TextField
-                  label="PL (Pasien Lama)"
-                  value={formData.PTM_RUJUK_FKRTL_PL || ""}
-                  onChange={(e) =>
-                    handleChange("PTM_RUJUK_FKRTL_PL", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-              </Stack>
-            </Box>
-
-            {/* Dirujuk Balik dari Puskesmas */}
-            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                Dirujuk Balik dari Puskesmas
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="PB (Pasien Baru)"
-                  value={formData.DIRUJUK_BALIK_PUSKESMAS_PB || ""}
-                  onChange={(e) =>
-                    handleChange("DIRUJUK_BALIK_PUSKESMAS_PB", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-                <TextField
-                  label="PL (Pasien Lama)"
-                  value={formData.DIRUJUK_BALIK_PUSKESMAS_PL || ""}
-                  onChange={(e) =>
-                    handleChange("DIRUJUK_BALIK_PUSKESMAS_PL", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-              </Stack>
-            </Box>
-
-            {/* Dirujuk Balik dari FKRTL */}
-            <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-                Dirujuk Balik dari FKRTL
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="PB (Pasien Baru)"
-                  value={formData.DIRUJUK_BALIK_FKRTL_PB || ""}
-                  onChange={(e) =>
-                    handleChange("DIRUJUK_BALIK_FKRTL_PB", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-                <TextField
-                  label="PL (Pasien Lama)"
-                  value={formData.DIRUJUK_BALIK_FKRTL_PL || ""}
-                  onChange={(e) =>
-                    handleChange("DIRUJUK_BALIK_FKRTL_PL", e.target.value)
-                  }
-                  fullWidth
-                  placeholder="0"
-                />
-              </Stack>
+              {activeReferralType !== "none" && (
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: "16px",
+                    bgcolor: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    animation: "fadeIn 0.3s ease-out",
+                    "@keyframes fadeIn": {
+                      from: { opacity: 0, transform: "translateY(-10px)" },
+                      to: { opacity: 1, transform: "translateY(0)" },
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    fontWeight={700}
+                    sx={{ mb: 1.5, display: "block" }}
+                  >
+                    INPUT NILAI RUJUKAN (
+                    {
+                      REFERRAL_CATEGORIES.find(
+                        (c) => c.value === activeReferralType,
+                      )?.label
+                    }
+                    )
+                  </Typography>
+                  <Stack direction="row" spacing={2}>
+                    {(() => {
+                      const activeCat = REFERRAL_CATEGORIES.find(
+                        (c) => c.value === activeReferralType,
+                      );
+                      return (
+                        <>
+                          <TextField
+                            label="PB (Pasien Baru)"
+                            value={
+                              activeCat?.pb
+                                ? (formData[
+                                    activeCat.pb as keyof typeof formData
+                                  ] as string) || ""
+                                : ""
+                            }
+                            onChange={(e) =>
+                              activeCat?.pb &&
+                              handleChange(
+                                activeCat.pb as keyof typeof formData,
+                                e.target.value,
+                              )
+                            }
+                            fullWidth
+                            placeholder="Isi 1 jika pasien rujukan baru"
+                            focused
+                            size="small"
+                          />
+                          <TextField
+                            label="PL (Pasien Lama)"
+                            value={
+                              activeCat?.pl
+                                ? (formData[
+                                    activeCat.pl as keyof typeof formData
+                                  ] as string) || ""
+                                : ""
+                            }
+                            onChange={(e) =>
+                              activeCat?.pl &&
+                              handleChange(
+                                activeCat.pl as keyof typeof formData,
+                                e.target.value,
+                              )
+                            }
+                            fullWidth
+                            placeholder="Isi 1 jika pasien rujukan lama"
+                            focused
+                            size="small"
+                          />
+                        </>
+                      );
+                    })()}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           </Box>
         </DialogContent>
