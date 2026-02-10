@@ -7,6 +7,8 @@ export interface PatientData {
   ENAM_BELAS_LIMA_BELAS: string;
   L: string;
   P: string;
+  BARU: string;
+  LAMA: string;
   NAMA: string;
   USIA: string;
   NIP: string;
@@ -169,7 +171,7 @@ class PatientService {
     }
   }
 
-  // HAPUS PASIEN
+  // HAPUS PASIEN (SINGLE)
   async deletePatient(id: number, sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
     try {
       const baseUrl = this.getBaseUrl(poli);
@@ -193,6 +195,34 @@ class PatientService {
       return await this.parseResponse(response, 'delete');
     } catch (error) {
       console.error('Error deleting patient:', error);
+      throw error;
+    }
+  }
+
+  // HAPUS PASIEN (BULK)
+  async deletePatients(ids: number[], sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<{ message: string }> {
+    try {
+      const baseUrl = this.getBaseUrl(poli);
+      this.checkUrl(baseUrl);
+
+      console.log(`🔴 DELETE BULK Request [${poli}]`);
+      console.log('Sheet:', sheetName);
+      console.log('IDs Count:', ids.length);
+      
+      const payload = { ids, sheetName };
+
+      const response = await fetch(`${baseUrl}?action=deleteBulk`, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await this.parseResponse(response, 'deleteBulk');
+    } catch (error) {
+      console.error('Error deleting patients bulk:', error);
       throw error;
     }
   }

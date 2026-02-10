@@ -16,6 +16,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TableFooter, // Added TableFooter
   TableRow,
   Chip as MuiChip,
   CircularProgress,
@@ -52,6 +53,7 @@ export default function DashboardPage() {
     totalPatients: 0,
     todayPatients: 0,
     todayGender: { L: 0, P: 0 },
+    todayType: { baru: 0, lama: 0 },
   });
 
   // State untuk total gabungan kedua poli
@@ -59,9 +61,11 @@ export default function DashboardPage() {
     totalBothPoli: 0,
     totalL: 0,
     totalP: 0,
+    totalBaru: 0,
+    totalLama: 0,
     periodTotals: {
-      umum: { total: 0, L: 0, P: 0 },
-      gigi: { total: 0, L: 0, P: 0 },
+      umum: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
+      gigi: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
     },
   });
 
@@ -412,15 +416,20 @@ export default function DashboardPage() {
 
       let countL = 0;
       let countP = 0;
+      let countBaru = 0;
+      let countLama = 0;
       todayData.forEach((p) => {
         if (isFilled(p.L)) countL++;
         if (isFilled(p.P)) countP++;
+        if (isFilled(p.BARU)) countBaru++;
+        if (isFilled(p.LAMA)) countLama++;
       });
 
       setStatsData({
         totalPatients: total,
         todayPatients: todayCount,
         todayGender: { L: countL, P: countP },
+        todayType: { baru: countBaru, lama: countLama },
       });
     } catch (error) {
       console.error(`Failed to fetch stats:`, error);
@@ -428,6 +437,7 @@ export default function DashboardPage() {
         totalPatients: 0,
         todayPatients: 0,
         todayGender: { L: 0, P: 0 },
+        todayType: { baru: 0, lama: 0 },
       });
     } finally {
       setLoading(false);
@@ -464,9 +474,27 @@ export default function DashboardPage() {
         totalBothPoli: resUmumTotal + resGigiTotal,
         totalL: resUmumL + resGigiL,
         totalP: resUmumP + resGigiP,
+        totalBaru:
+          dataUmum.filter((p) => isFilled(p.BARU)).length +
+          dataGigi.filter((p) => isFilled(p.BARU)).length,
+        totalLama:
+          dataUmum.filter((p) => isFilled(p.LAMA)).length +
+          dataGigi.filter((p) => isFilled(p.LAMA)).length,
         periodTotals: {
-          umum: { total: resUmumTotal, L: resUmumL, P: resUmumP },
-          gigi: { total: resGigiTotal, L: resGigiL, P: resGigiP },
+          umum: {
+            total: resUmumTotal,
+            L: resUmumL,
+            P: resUmumP,
+            baru: dataUmum.filter((p) => isFilled(p.BARU)).length,
+            lama: dataUmum.filter((p) => isFilled(p.LAMA)).length,
+          },
+          gigi: {
+            total: resGigiTotal,
+            L: resGigiL,
+            P: resGigiP,
+            baru: dataGigi.filter((p) => isFilled(p.BARU)).length,
+            lama: dataGigi.filter((p) => isFilled(p.LAMA)).length,
+          },
         },
       });
     } catch (error) {
@@ -475,9 +503,11 @@ export default function DashboardPage() {
         totalBothPoli: 0,
         totalL: 0,
         totalP: 0,
+        totalBaru: 0,
+        totalLama: 0,
         periodTotals: {
-          umum: { total: 0, L: 0, P: 0 },
-          gigi: { total: 0, L: 0, P: 0 },
+          umum: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
+          gigi: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
         },
       });
     }
@@ -525,6 +555,17 @@ export default function DashboardPage() {
       trend: "Update Hari Ini",
       trendColor: "#059669",
       trendBg: "rgba(52, 211, 153, 0.15)",
+    },
+    {
+      title: "Tipe Pasien",
+      value: loading
+        ? "..."
+        : `${statsData.todayType.baru} Baru | ${statsData.todayType.lama} Lama`,
+      icon: <AssignmentIcon sx={{ fontSize: 28, color: "white" }} />,
+      gradient: "linear-gradient(135deg, #6366F1 0%, #4338CA 100%)",
+      trend: "Pasien Hari Ini",
+      trendColor: "#4338CA",
+      trendBg: "rgba(99, 102, 241, 0.15)",
     },
   ];
 
@@ -996,6 +1037,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Card: Perincian Per Periode (Bulan Ini) */}
+          {/* Card: Tipe Pasien (Baru & Lama) - Reverted to Original List Style */}
           <Card
             sx={{
               borderRadius: "24px",
@@ -1016,7 +1058,7 @@ export default function DashboardPage() {
                   fontWeight="800"
                   color="#1E293B"
                 >
-                  Kunjungan Filtered: {periodName}
+                  Tipe Pasien: {periodName}
                 </Typography>
                 <Box
                   sx={{
@@ -1031,11 +1073,16 @@ export default function DashboardPage() {
                     boxShadow: "0 2px 6px rgba(245, 158, 11, 0.3)",
                   }}
                 >
-                  {combinedStats.totalBothPoli} TOTAL
+                  {loading
+                    ? "..."
+                    : (combinedStats.totalBaru || 0) +
+                      (combinedStats.totalLama || 0)}{" "}
+                  TOTAL
                 </Box>
               </Box>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {/* Poli Umum */}
                 <Box
                   display="flex"
                   justifyContent="space-between"
@@ -1064,7 +1111,10 @@ export default function DashboardPage() {
                       fontWeight="800"
                       color="#1E293B"
                     >
-                      {loading ? "..." : combinedStats.periodTotals.umum.total}{" "}
+                      {loading
+                        ? "..."
+                        : combinedStats.periodTotals.umum.baru +
+                          combinedStats.periodTotals.umum.lama}{" "}
                       Pasien
                     </Typography>
                     <Typography
@@ -1072,11 +1122,15 @@ export default function DashboardPage() {
                       color="text.secondary"
                       fontWeight="600"
                     >
-                      {combinedStats.periodTotals.umum.L} L |{" "}
-                      {combinedStats.periodTotals.umum.P} P
+                      Baru: {combinedStats.periodTotals.umum.baru} | Lama:{" "}
+                      {combinedStats.periodTotals.umum.lama}
                     </Typography>
                   </Box>
                 </Box>
+
+                <Divider sx={{ borderStyle: "dashed" }} />
+
+                {/* Poli Gigi */}
                 <Box
                   display="flex"
                   justifyContent="space-between"
@@ -1105,7 +1159,10 @@ export default function DashboardPage() {
                       fontWeight="800"
                       color="#1E293B"
                     >
-                      {loading ? "..." : combinedStats.periodTotals.gigi.total}{" "}
+                      {loading
+                        ? "..."
+                        : combinedStats.periodTotals.gigi.baru +
+                          combinedStats.periodTotals.gigi.lama}{" "}
                       Pasien
                     </Typography>
                     <Typography
@@ -1113,8 +1170,8 @@ export default function DashboardPage() {
                       color="text.secondary"
                       fontWeight="600"
                     >
-                      {combinedStats.periodTotals.gigi.L} L |{" "}
-                      {combinedStats.periodTotals.gigi.P} P
+                      Baru: {combinedStats.periodTotals.gigi.baru} | Lama:{" "}
+                      {combinedStats.periodTotals.gigi.lama}
                     </Typography>
                   </Box>
                 </Box>
@@ -1197,7 +1254,7 @@ export default function DashboardPage() {
             >
               {YEARS.map((y) => (
                 <MenuItem key={y} value={y}>
-                  Tahun {y}
+                  {y}
                 </MenuItem>
               ))}
             </Select>
@@ -1214,7 +1271,7 @@ export default function DashboardPage() {
                   sx={{
                     fontWeight: 800,
                     color: "#475569",
-                    fontSize: "0.95rem",
+                    fontSize: "0.90rem",
                     width: "30%", // Reduced width
                   }}
                 >
@@ -1225,7 +1282,7 @@ export default function DashboardPage() {
                   sx={{
                     fontWeight: 800,
                     color: "#4F46E5",
-                    fontSize: "0.95rem",
+                    fontSize: "0.90rem",
                   }}
                 >
                   TOTAL GABUNGAN
@@ -1235,7 +1292,7 @@ export default function DashboardPage() {
                   sx={{
                     fontWeight: 800,
                     color: "#0D9488",
-                    fontSize: "0.95rem",
+                    fontSize: "0.90rem",
                   }}
                 >
                   POLI UMUM
@@ -1245,7 +1302,7 @@ export default function DashboardPage() {
                   sx={{
                     fontWeight: 800,
                     color: "#DB2777",
-                    fontSize: "0.95rem",
+                    fontSize: "0.90rem",
                   }}
                 >
                   POLI GIGI
@@ -1307,6 +1364,68 @@ export default function DashboardPage() {
                 ))
               )}
             </TableBody>
+            {periodicRekap.length > 0 && (
+              <TableFooter>
+                <TableRow
+                  sx={{ bgcolor: "#F8FAFC", borderTop: "2px solid #E2E8F0" }}
+                >
+                  <TableCell
+                    sx={{
+                      fontWeight: 800,
+                      color: "#1E293B",
+                      fontSize: "15px",
+                      py: 2,
+                    }}
+                  >
+                    TOTAL TAHUN {tableYear}
+                  </TableCell>
+                  <TableCell align="center">
+                    <Box
+                      sx={{
+                        display: "inline-block",
+                        fontWeight: 900,
+                        bgcolor: "#1E293B",
+                        color: "#fff",
+                        px: 2,
+                        py: 0.5,
+                        borderRadius: "99px",
+                        fontSize: "15px",
+                        boxShadow: "0 2px 6px rgba(30, 41, 59, 0.2)",
+                      }}
+                    >
+                      {periodicRekap
+                        .reduce((a, b) => a + b.total, 0)
+                        .toLocaleString()}{" "}
+                      Pasien
+                    </Box>
+                  </TableCell>
+                  <TableCell
+                    align="center"
+                    sx={{
+                      fontWeight: 800,
+                      color: "#0D9488",
+                      fontSize: "`5px",
+                    }}
+                  >
+                    {periodicRekap
+                      .reduce((a, b) => a + b.umum, 0)
+                      .toLocaleString()}
+                  </TableCell>
+                  <TableCell
+                    align="center"
+                    sx={{
+                      fontWeight: 800,
+                      color: "#DB2777",
+                      fontSize: "15px",
+                    }}
+                  >
+                    {periodicRekap
+                      .reduce((a, b) => a + b.gigi, 0)
+                      .toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </TableContainer>
       </Paper>

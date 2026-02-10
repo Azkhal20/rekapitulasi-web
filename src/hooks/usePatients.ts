@@ -38,5 +38,12 @@ export const usePatientMutations = (sheetName: string, poliType: PoliType) => {
     },
   });
 
-  return { addMutation, updateMutation, deleteMutation };
+  const deleteBulkMutation = useMutation({
+    mutationFn: (ids: number[]) => patientService.deletePatients(ids, sheetName, poliType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  return { addMutation, updateMutation, deleteMutation, deleteBulkMutation };
 };
