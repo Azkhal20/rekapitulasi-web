@@ -35,7 +35,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import HistoryIcon from "@mui/icons-material/History";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import CheckboxIcon from "@mui/icons-material/CheckBox";
-import IndeterminateCheckBoxIcon from "@mui/icons-material/IndeterminateCheckBox";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
 import { PatientData, PoliType } from "@/services/patientService";
@@ -118,7 +117,7 @@ export default function PatientDataTable({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // React Query Mutations
-  const { addMutation, updateMutation, deleteMutation, deleteBulkMutation } =
+  const { addMutation, updateMutation, deleteBulkMutation } =
     usePatientMutations(sheetName, poliType);
 
   const [nextTahun, setNextTahun] = useState<string>("1");
@@ -449,7 +448,7 @@ export default function PatientDataTable({
       setSelectedIds([]);
     } else {
       const allIds = filteredAndSortedData.map(
-        (row) => Number((row as any).id) || 0,
+        (row) => (row as PatientData).id || 0,
       );
       setSelectedIds(allIds);
     }
@@ -1273,7 +1272,7 @@ export default function PatientDataTable({
                 </TableRow>
               ) : (
                 paginatedData.map((row, index) => {
-                  const rowId = Number((row as any).id) || 0;
+                  const rowId = (row as PatientData).id || 0;
                   const isSelected = selectedIds.includes(rowId);
                   return (
                     <TableRow

@@ -363,8 +363,6 @@ export default function PatientFormDialog({
           DIRUJUK_BALIK_PUSKESMAS_PL: "",
           DIRUJUK_BALIK_FKRTL_PB: "",
           DIRUJUK_BALIK_FKRTL_PL: "",
-          BARU: "",
-          LAMA: "",
         });
       }
       setError(null);
@@ -693,8 +691,13 @@ export default function PatientFormDialog({
             </Box>
 
             <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <FormControl fullWidth sx={{ mb: activeReferralType !== "none" ? 2 : 0 }}>
-                <InputLabel id="referral-type-label">Pilih Jenis Rujukan</InputLabel>
+              <FormControl
+                fullWidth
+                sx={{ mb: activeReferralType !== "none" ? 2 : 0 }}
+              >
+                <InputLabel id="referral-type-label">
+                  Pilih Jenis Rujukan
+                </InputLabel>
                 <Select
                   labelId="referral-type-label"
                   value={activeReferralType}
