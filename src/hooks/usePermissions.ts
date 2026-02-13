@@ -44,5 +44,8 @@ export const usePermissions = () => {
     canEdit,
     canDelete,
     isViewer,
+    isSuperAdmin,
+    isAdmin,
+    isOperator,
   };
 };
