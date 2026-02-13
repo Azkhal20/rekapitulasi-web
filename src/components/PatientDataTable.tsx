@@ -922,28 +922,30 @@ export default function PatientDataTable({
             <TableHead>
               {/* Row 1: Main Headers + Checkbox */}
               <TableRow>
-                <TableCell
-                  width={40}
-                  rowSpan={2}
-                  padding="checkbox"
-                  sx={{
-                    backgroundColor: "#F1F5F9",
-                    borderBottom: "1px solid #ddd",
-                  }}
-                >
-                  <Checkbox
-                    indeterminate={
-                      selectedIds.length > 0 &&
-                      selectedIds.length < filteredAndSortedData.length
-                    }
-                    checked={
-                      filteredAndSortedData.length > 0 &&
-                      selectedIds.length === filteredAndSortedData.length
-                    }
-                    onChange={handleToggleAll}
-                    sx={{ color: "#696CFF" }}
-                  />
-                </TableCell>
+                {canDelete && (
+                  <TableCell
+                    width={40}
+                    rowSpan={2}
+                    padding="checkbox"
+                    sx={{
+                      backgroundColor: "#F1F5F9",
+                      borderBottom: "1px solid #ddd",
+                    }}
+                  >
+                    <Checkbox
+                      indeterminate={
+                        selectedIds.length > 0 &&
+                        selectedIds.length < filteredAndSortedData.length
+                      }
+                      checked={
+                        filteredAndSortedData.length > 0 &&
+                        selectedIds.length === filteredAndSortedData.length
+                      }
+                      onChange={handleToggleAll}
+                      sx={{ color: "#696CFF" }}
+                    />
+                  </TableCell>
+                )}
                 <TableCell
                   width={50}
                   rowSpan={2}
@@ -1286,13 +1288,15 @@ export default function PatientDataTable({
                           : "inherit",
                       }}
                     >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => handleToggleRow(rowId)}
-                          sx={{ color: "#696CFF" }}
-                        />
-                      </TableCell>
+                      {canDelete && (
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => handleToggleRow(rowId)}
+                            sx={{ color: "#696CFF" }}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell
                         sx={{
                           color: "black",
@@ -1412,7 +1416,7 @@ export default function PatientDataTable({
       </Box>
 
       {/* Floating Action Bar for Bulk Selection */}
-      <Fade in={selectedIds.length > 0}>
+      <Fade in={selectedIds.length > 0 && canDelete}>
         <Paper
           elevation={10}
           sx={{

@@ -34,9 +34,9 @@ export const usePermissions = () => {
   // Admin: All access (based on user request)
   // Viewer: Read only
   
-  const canCreate = isSuperAdmin || isAdmin || isOperator;
-  const canEdit = isSuperAdmin || isAdmin || isOperator;
-  const canDelete = isSuperAdmin || isAdmin; // Maybe restrict delete for Operator? For now, allow if Admin.
+  const canCreate = !isViewer && (isSuperAdmin || isAdmin || isOperator);
+  const canEdit = !isViewer && (isSuperAdmin || isAdmin || isOperator);
+  const canDelete = !isViewer && (isSuperAdmin || isAdmin);
 
   return {
     role,
@@ -44,5 +44,8 @@ export const usePermissions = () => {
     canEdit,
     canDelete,
     isViewer,
+    isSuperAdmin,
+    isAdmin,
+    isOperator,
   };
 };

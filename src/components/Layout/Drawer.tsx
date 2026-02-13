@@ -21,8 +21,10 @@ import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import SummarizeIcon from "@mui/icons-material/Summarize";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Box,
   Divider,
@@ -110,6 +112,17 @@ const menuItems = [
       },
     ],
   },
+  {
+    header: "ADMINISTRATOR",
+    requiredRole: "super_admin",
+    items: [
+      {
+        text: "Manajemen Pengguna",
+        icon: <ManageAccountsIcon />,
+        href: "/dashboard/users",
+      },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -119,6 +132,7 @@ interface SidebarProps {
 
 export default function Sidebar({ open, drawerWidth }: SidebarProps) {
   const pathname = usePathname();
+  const { isSuperAdmin } = usePermissions();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Data Pasien": true,
   });
@@ -172,185 +186,194 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
         )}
       </DrawerHeader>
 
-      <List sx={{ px: 1.5 }}>
-        {menuItems.map((section, idx) => (
-          <Box key={idx}>
-            {open && (
-              <Typography
-                variant="caption"
-                sx={{
-                  px: 2,
-                  mt: 2,
-                  mb: 1,
-                  display: "block",
-                  fontWeight: 700,
-                  color: "#a1acb8",
-                  opacity: 0.8,
-                  fontSize: "0.75rem",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                {section.header}
-              </Typography>
-            )}
-            {section.items.map((item) => {
-              // Menu dengan dropdown
-              if (item.children) {
-                const isOpen = openGroups[item.text];
-                const isChildActive = item.children.some(
-                  (child) => pathname === child.href,
-                );
+      <List sx={{ px: 1 }}>
+        {menuItems.map((section, idx) =>
+          section.requiredRole === "super_admin" && !isSuperAdmin ? null : (
+            <Box key={idx}>
+              {open && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    px: 2,
+                    mt: 2,
+                    mb: 1,
+                    display: "block",
+                    fontWeight: 700,
+                    color: "#a1acb8",
+                    opacity: 0.8,
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {section.header}
+                </Typography>
+              )}
+              {section.items.map((item) => {
+                // Menu dengan dropdown
+                if (item.children) {
+                  const isOpen = openGroups[item.text];
+                  const isChildActive = item.children.some(
+                    (child) => pathname === child.href,
+                  );
 
-                return (
-                  <Box key={item.text}>
-                    <ListItem disablePadding sx={{ display: "block", mb: 0.5 }}>
-                      <ListItemButton
-                        onClick={() => handleGroupClick(item.text)}
-                        sx={{
-                          minHeight: 44,
-                          justifyContent: open ? "initial" : "center",
-                          px: 2.5,
-                          borderRadius: 2,
-                          color: isChildActive
-                            ? "primary.main"
-                            : "text.primary",
-                          backgroundColor:
-                            isChildActive && !isOpen
-                              ? "rgba(105, 108, 255, 0.08)"
-                              : "transparent",
-                          "&:hover": {
-                            backgroundColor: "rgba(69, 75, 87, 0.04)",
-                          },
-                        }}
+                  return (
+                    <Box key={item.text}>
+                      <ListItem
+                        disablePadding
+                        sx={{ display: "block", mb: 0.5 }}
                       >
-                        <ListItemIcon
+                        <ListItemButton
+                          onClick={() => handleGroupClick(item.text)}
                           sx={{
-                            minWidth: 0,
-                            mr: open ? 2 : "auto",
-                            justifyContent: "center",
-                            color: isChildActive ? "inherit" : "#566a7f",
+                            minHeight: 44,
+                            justifyContent: open ? "initial" : "center",
+                            px: 2,
+                            borderRadius: 2,
+                            color: isChildActive
+                              ? "primary.main"
+                              : "text.primary",
+                            backgroundColor:
+                              isChildActive && !isOpen
+                                ? "rgba(105, 108, 255, 0.08)"
+                                : "transparent",
+                            "&:hover": {
+                              backgroundColor: "rgba(69, 75, 87, 0.04)",
+                            },
                           }}
                         >
-                          {item.icon}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={item.text}
-                          primaryTypographyProps={{
-                            fontSize: "0.9375rem",
-                            fontWeight: isChildActive ? 600 : 400,
-                          }}
-                          sx={{ opacity: open ? 1 : 0 }}
-                        />
-                        {open && (isOpen ? <ExpandLess /> : <ExpandMore />)}
-                      </ListItemButton>
-                    </ListItem>
+                          <ListItemIcon
+                            sx={{
+                              minWidth: 0,
+                              mr: open ? 1.5 : "auto",
+                              justifyContent: "center",
+                              color: isChildActive ? "inherit" : "#566a7f",
+                            }}
+                          >
+                            {item.icon}
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={item.text}
+                            primaryTypographyProps={{
+                              fontSize: "0.9375rem",
+                              fontWeight: isChildActive ? 600 : 400,
+                            }}
+                            sx={{ opacity: open ? 1 : 0 }}
+                          />
+                          {open && (isOpen ? <ExpandLess /> : <ExpandMore />)}
+                        </ListItemButton>
+                      </ListItem>
 
-                    <Collapse in={isOpen && open} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        {item.children.map((child) => {
-                          const isActive = pathname === child.href;
-                          return (
-                            <ListItemButton
-                              key={child.text}
-                              component={Link}
-                              href={child.href}
-                              sx={{
-                                minHeight: 40,
-                                pl: open ? 4 : 2.5,
-                                justifyContent: open ? "initial" : "center",
-                                borderRadius: 2,
-                                mb: 0.5,
-                                color: isActive
-                                  ? "primary.main"
-                                  : "text.secondary",
-                                backgroundColor: isActive
-                                  ? "rgba(105, 108, 255, 0.16) !important"
-                                  : "transparent",
-                                "&:hover": {
-                                  backgroundColor: "rgba(69, 75, 87, 0.04)",
-                                },
-                              }}
-                            >
-                              <ListItemIcon
+                      <Collapse
+                        in={isOpen && open}
+                        timeout="auto"
+                        unmountOnExit
+                      >
+                        <List component="div" disablePadding>
+                          {item.children.map((child) => {
+                            const isActive = pathname === child.href;
+                            return (
+                              <ListItemButton
+                                key={child.text}
+                                component={Link}
+                                href={child.href}
                                 sx={{
-                                  minWidth: 0,
-                                  mr: open ? 2 : "auto",
-                                  justifyContent: "center",
-                                  color: isActive ? "inherit" : "#566a7f",
-                                  display: open ? "flex" : "none",
+                                  minHeight: 40,
+                                  pl: open ? 4 : 2.5,
+                                  justifyContent: open ? "initial" : "center",
+                                  borderRadius: 2,
+                                  mb: 0.5,
+                                  color: isActive
+                                    ? "primary.main"
+                                    : "text.secondary",
+                                  backgroundColor: isActive
+                                    ? "rgba(105, 108, 255, 0.16) !important"
+                                    : "transparent",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(69, 75, 87, 0.04)",
+                                  },
                                 }}
                               >
-                                {child.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={child.text}
-                                primaryTypographyProps={{
-                                  fontSize: "0.85rem",
-                                  fontWeight: isActive ? 600 : 400,
-                                }}
-                                sx={{ opacity: open ? 1 : 0 }}
-                              />
-                            </ListItemButton>
-                          );
-                        })}
-                      </List>
-                    </Collapse>
-                  </Box>
-                );
-              }
+                                <ListItemIcon
+                                  sx={{
+                                    minWidth: 0,
+                                    mr: open ? 2 : "auto",
+                                    justifyContent: "center",
+                                    color: isActive ? "inherit" : "#566a7f",
+                                    display: open ? "flex" : "none",
+                                  }}
+                                >
+                                  {child.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={child.text}
+                                  primaryTypographyProps={{
+                                    fontSize: "0.85rem",
+                                    fontWeight: isActive ? 600 : 400,
+                                  }}
+                                  sx={{ opacity: open ? 1 : 0 }}
+                                />
+                              </ListItemButton>
+                            );
+                          })}
+                        </List>
+                      </Collapse>
+                    </Box>
+                  );
+                }
 
-              // Menu link biasa
-              const isActive = pathname === item.href;
-              return (
-                <ListItem
-                  key={item.text}
-                  disablePadding
-                  sx={{ display: "block", mb: 0.5 }}
-                >
-                  <ListItemButton
-                    component={Link}
-                    href={item.href || "#"}
-                    selected={isActive}
-                    sx={{
-                      minHeight: 44,
-                      justifyContent: open ? "initial" : "center",
-                      px: 2.5,
-                      borderRadius: 2,
-                      color: isActive ? "primary.main" : "text.primary",
-                      backgroundColor: isActive
-                        ? "rgba(105, 108, 255, 0.16) !important"
-                        : "transparent",
-                      transition: "all 0.2s ease-in-out",
-                      "&:hover": {
-                        backgroundColor: "rgba(69, 75, 87, 0.04)",
-                        color: isActive ? "primary.main" : "#435971",
-                      },
-                    }}
+                // Menu link biasa
+                const isActive = pathname === item.href;
+                return (
+                  <ListItem
+                    key={item.text}
+                    disablePadding
+                    sx={{ display: "block", mb: 0.5 }}
                   >
-                    <ListItemIcon
+                    <ListItemButton
+                      component={Link}
+                      href={item.href || "#"}
+                      selected={isActive}
                       sx={{
-                        minWidth: 0,
-                        mr: open ? 2 : "auto",
-                        justifyContent: "center",
-                        color: isActive ? "inherit" : "#566a7f",
+                        minHeight: 44,
+                        justifyContent: open ? "initial" : "center",
+                        px: 2,
+                        borderRadius: 2,
+                        color: isActive ? "primary.main" : "text.primary",
+                        backgroundColor: isActive
+                          ? "rgba(105, 108, 255, 0.16) !important"
+                          : "transparent",
+                        transition: "all 0.2s ease-in-out",
+                        "&:hover": {
+                          backgroundColor: "rgba(69, 75, 87, 0.04)",
+                          color: isActive ? "primary.main" : "#435971",
+                        },
                       }}
-                    >
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontSize: "0.9375rem",
-                        fontWeight: isActive ? 600 : 400,
-                      }}
-                      sx={{ opacity: open ? 1 : 0 }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </Box>
-        ))}
+                    > 
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 0,
+                          mr: open ? 1.5 : "auto",
+                          justifyContent: "center",
+                          color: isActive ? "inherit" : "#566a7f",
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.text}
+                        primaryTypographyProps={{
+                          fontSize: "0.9375rem",
+                          fontWeight: isActive ? 600 : 400,
+                        }}
+                        sx={{ opacity: open ? 1 : 0 }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
+            </Box>
+          ),
+        )}
       </List>
 
       {/* Sidebar Footer or Spacer if needed */}
