@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Box,
-  Typography,
-  FormControl,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Divider,
-} from "@mui/material";
+import { Box, Typography, CircularProgress, Divider } from "@mui/material";
 import {
   BarChart,
   Bar,
@@ -24,42 +16,20 @@ import ManIcon from "@mui/icons-material/Man";
 import WomanIcon from "@mui/icons-material/Woman";
 import { patientService, PoliType } from "@/services/patientService";
 
-// Custom Order
-const MONTHS = [
-  "JANUARI",
-  "FEBRUARI",
-  "MARET",
-  "APRIL",
-  "MEI",
-  "JUNI",
-  "JULI",
-  "AGUSTUS",
-  "SEPTEMBER",
-  "OKTOBER",
-  "NOVEMBER",
-  "DESEMBER",
-];
-
-const YEARS = ["2025", "2026", "2027", "2028"];
-
-// Helper to get current month name in Uppercase Indonesia
-const getCurrentMonthName = () => {
-  const date = new Date();
-  const month = date.toLocaleDateString("id-ID", { month: "long" });
-  return month.toUpperCase();
-};
+// Custom constants can be added here if needed
 
 interface TopDiagnosisChartProps {
   poliType: PoliType;
   targetMonth: string;
   targetYear: string;
-  onDataReady?: (data: Array<{name: string; count: number}>) => void;
+  onDataReady?: (data: Array<{ name: string; count: number }>) => void;
 }
 
 export default function TopDiagnosisChart({
   poliType,
   targetMonth,
   targetYear,
+  onDataReady,
 }: TopDiagnosisChartProps) {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<{ name: string; count: number }[]>(
@@ -104,11 +74,30 @@ export default function TopDiagnosisChart({
         let countP = 0;
 
         patients.forEach((p) => {
-          // Diagnosis
-          let diag = p.DIAGNOSIS || p.DIAGNOSIS;
-          if (diag && diag !== "-" && diag.trim() !== "") {
-            diag = diag.trim().toUpperCase();
-            diagnosisCounts[diag] = (diagnosisCounts[diag] || 0) + 1;
+          // Diagnosis - Improved multi-entry parsing
+          const rawDiag = p.DIAGNOSIS || "";
+          if (rawDiag.trim() !== "" && rawDiag !== "-") {
+            // 1. Split by numbering pattern (e.g., "1. Diag1 2. Diag2") or newline
+            // This handles "1. Text \n 2. Text" or "1. Text 2. Text"
+            const parts = rawDiag
+              .split(/\d+\.\s+/)
+              .map((part) => part.trim())
+              .filter((part) => part !== "");
+
+            parts.forEach((part) => {
+              // 2. Clean data: Split by "." to remove tooth numbers/extra info
+              // e.g., "Gangren pulpa.18" -> "Gangren pulpa"
+              let cleanName = part.split(".")[0].trim();
+
+              // Extra cleanup: remove trailing numbers or simple tooth codes
+              // if they didn't use a dot (e.g., "Gangren pulpa 18")
+              // But strictly follow user's "." suggestion first
+              if (cleanName) {
+                cleanName = cleanName.toUpperCase();
+                diagnosisCounts[cleanName] =
+                  (diagnosisCounts[cleanName] || 0) + 1;
+              }
+            });
           }
 
           // Gender - Looser check
@@ -124,6 +113,11 @@ export default function TopDiagnosisChart({
 
         setChartData(sortedData);
         setGenderStats({ L: countL, P: countP });
+
+        // Send data back to parent for export
+        if (onDataReady) {
+          onDataReady(sortedData);
+        }
       } catch (error) {
         console.error("Failed to fetch data for chart", error);
         setChartData([]);
@@ -134,7 +128,7 @@ export default function TopDiagnosisChart({
     };
 
     fetchData();
-  }, [targetMonth, targetYear, poliType]);
+  }, [targetMonth, targetYear, poliType, onDataReady]);
 
   // Custom Tooltip for Bar Chart
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
