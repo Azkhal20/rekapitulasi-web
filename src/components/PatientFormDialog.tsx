@@ -18,7 +18,10 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Autocomplete,
+  createFilterOptions,
 } from "@mui/material";
+import icd10Data from "@/data/icd10.json";
 import CloseIcon from "@mui/icons-material/Close";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import SendIcon from "@mui/icons-material/Send";
@@ -35,6 +38,11 @@ interface PatientFormDialogProps {
   existingPatients?: PatientData[] | Patient[]; // Use strict types if possible
   lastL?: string;
   lastP?: string;
+}
+
+interface ICD10Entry {
+  CODE: string;
+  DISPLAY: string;
 }
 
 // Helper: Convert "YYYY-MM-DD" to "DD MMM YYYY"
@@ -637,22 +645,134 @@ export default function PatientFormDialog({
               rows={2}
             />
 
-            <TextField
-              label="Diagnosis"
-              value={formData.DIAGNOSIS}
-              onChange={(e) => handleChange("DIAGNOSIS", e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
-            />
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
+            >
+              <Autocomplete
+                freeSolo
+                fullWidth
+                options={icd10Data as ICD10Entry[]}
+                getOptionLabel={(option) => {
+                  if (typeof option === "string") return option;
+                  return `${option.CODE} - ${option.DISPLAY}`;
+                }}
+                filterOptions={(options, state) => {
+                  // Mengambil term pencarian hanya dari baris terakhir (setelah nomor)
+                  const lines = state.inputValue.split("\n");
+                  const currentLine = lines[lines.length - 1] || "";
+                  const searchTerm = currentLine
+                    .replace(/^\d+\.\s*/, "")
+                    .trim();
 
-            <TextField
-              label="ICD-10"
-              value={formData.ICD10}
-              onChange={(e) => handleChange("ICD10", e.target.value)}
-              fullWidth
-              placeholder="Kode ICD-10"
-            />
+                  return createFilterOptions<ICD10Entry>({
+                    stringify: (option: ICD10Entry) =>
+                      `${option.CODE} ${option.DISPLAY}`,
+                    limit: 4000,
+                  })(options as ICD10Entry[], {
+                    ...state,
+                    inputValue: searchTerm,
+                  });
+                }}
+                value={formData.DIAGNOSIS}
+                onInputChange={(event, newInputValue, reason) => {
+                  // Hanya update saat mengetik manual
+                  if (reason === "input") {
+                    handleChange("DIAGNOSIS", newInputValue);
+                  }
+                }}
+                onChange={(event, newValue) => {
+                  if (typeof newValue === "string") {
+                    setFormData((prev) => ({
+                      ...prev,
+                      DIAGNOSIS: newValue,
+                    }));
+                  } else if (newValue && typeof newValue === "object") {
+                    const entry = newValue as ICD10Entry;
+
+                    setFormData((prev) => {
+                      const currentDiag = prev.DIAGNOSIS;
+                      const currentICD = prev.ICD10;
+
+                      // 1. Ambil diagnosis yang sudah ada (baris yang sudah memiliki nomor)
+                      const confirmedDiags = currentDiag
+                        .split("\n")
+                        .filter((line) => /^\d+\.\s+/.test(line.trim()))
+                        .map((line) => line.trim().replace(/^\d+\.\s+/, ""));
+
+                      // 2. Tambahkan data baru
+                      confirmedDiags.push(entry.DISPLAY);
+
+                      // 3. Rakit kembali diagnosis (tambah \n dan nomor berikutnya)
+                      const updatedDiag =
+                        confirmedDiags
+                          .map((d, i) => `${i + 1}. ${d}`)
+                          .join("\n") + `\n${confirmedDiags.length + 1}. `;
+
+                      // 4. Update ICD-10 (tumpuk dengan koma)
+                      const existingCodes = currentICD
+                        ? currentICD
+                            .split(/,\s*/)
+                            .filter((c) => c.trim() !== "")
+                        : [];
+                      existingCodes.push(entry.CODE);
+                      const updatedICD = existingCodes.join(", ");
+
+                      return {
+                        ...prev,
+                        DIAGNOSIS: updatedDiag,
+                        ICD10: updatedICD,
+                      };
+                    });
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Diagnosis"
+                    placeholder="Ketik diagnosis atau kode ICD-10"
+                    multiline
+                    rows={3}
+                    onKeyDown={(e) => {
+                      // Logic Enter: Tambah nomor otomatis jika dropdown sedang tertutup
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        const lines = formData.DIAGNOSIS.split("\n").filter(
+                          (l) => l.trim() !== "",
+                        );
+                        if (lines.length > 0) {
+                          e.preventDefault();
+                          const nextNum = lines.length + 1;
+                          const hasTrailingNumber = /^\d+\.\s*$/.test(
+                            lines[lines.length - 1],
+                          );
+
+                          if (!hasTrailingNumber) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              DIAGNOSIS:
+                                prev.DIAGNOSIS.trimEnd() + `\n${nextNum}. `,
+                            }));
+                          }
+                        }
+                      }
+                    }}
+                  />
+                )}
+                sx={{ flexGrow: 1 }}
+              />
+
+              <TextField
+                label="ICD-10 (Kode)"
+                value={formData.ICD10}
+                onChange={(e) => handleChange("ICD10", e.target.value)}
+                placeholder="Kode"
+                multiline
+                rows={2}
+                sx={{ width: { xs: "100%", sm: "180px" } }}
+                helperText="Auto / Manual"
+              />
+            </Stack>
 
             <TextField
               label="Tindakan"
