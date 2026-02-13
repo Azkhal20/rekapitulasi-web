@@ -16,13 +16,14 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableFooter, // Added TableFooter
+  TableFooter,
   TableRow,
   Chip as MuiChip,
   CircularProgress,
   FormControl,
   InputLabel,
   Divider,
+  Button,
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import AssignmentIcon from "@mui/icons-material/Assignment";
@@ -30,6 +31,7 @@ import WcIcon from "@mui/icons-material/Wc";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import DownloadIcon from "@mui/icons-material/Download";
 import Link from "next/link";
 import TopDiagnosisChart from "@/components/Dashboard/TopDiagnosisChart";
 import {
@@ -37,6 +39,8 @@ import {
   PoliType,
   PatientData,
 } from "@/services/patientService";
+import { exportDashboardToExcel } from "@/utils/exportDashboardToExcel";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface PeriodicData {
   label: string;
@@ -80,6 +84,10 @@ export default function DashboardPage() {
 
   const [serverTime, setServerTime] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
+  const [topDiagnosisData, setTopDiagnosisData] = useState<
+    Array<{ name: string; count: number }>
+  >([]);
+  const { isSuperAdmin, isAdmin } = usePermissions();
 
   useEffect(() => {
     setIsMounted(true);
@@ -522,6 +530,35 @@ export default function DashboardPage() {
     }
   }, [fetchStats, fetchCombinedStats, isStorageLoaded]);
 
+  // Handler untuk export dashboard ke Excel
+  const handleExportToExcel = () => {
+    if (!isSuperAdmin && !isAdmin) {
+      alert("Anda tidak memiliki akses untuk export data");
+      return;
+    }
+
+    exportDashboardToExcel({
+      month: selectedMonth,
+      year: selectedYear,
+      totalPatients: statsData.totalPatients,
+      todayPatients: statsData.todayPatients,
+      todayGender: statsData.todayGender,
+      todayType: statsData.todayType,
+      combinedStats: combinedStats,
+      topDiagnosis: topDiagnosisData,
+      periodicRekap: periodicRekap,
+      selectedPoli: selectedPoli,
+    });
+  };
+
+  // Callback untuk menerima data diagnosis dari TopDiagnosisChart
+  const handleDiagnosisDataReady = useCallback(
+    (data: Array<{ name: string; count: number }>) => {
+      setTopDiagnosisData(data);
+    },
+    [],
+  );
+
   const stats = [
     {
       title: `Total Pasien (${selectedPoli === "gigi" ? "Gigi" : "Umum"})`,
@@ -704,6 +741,35 @@ export default function DashboardPage() {
               </ToggleButton>
             </ToggleButtonGroup>
           </Paper>
+
+          {(isSuperAdmin || isAdmin) && (
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportToExcel}
+              disabled={loading || loadingPeriodic}
+              sx={{
+                borderRadius: "12px",
+                px: 2,
+                py: 1.2,
+                textTransform: "none",
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #10B981 0%, #059669 100%)",
+                boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                "&:hover": {
+                  background:
+                    "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                  boxShadow: "0 6px 16px rgba(16, 185, 129, 0.35)",
+                },
+                "&:disabled": {
+                  background: "#E2E8F0",
+                  color: "#94A3B8",
+                },
+              }}
+            >
+              Export Excel
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -824,6 +890,7 @@ export default function DashboardPage() {
               poliType={selectedPoli}
               targetMonth={selectedMonth}
               targetYear={selectedYear}
+              onDataReady={handleDiagnosisDataReady}
             />
           </Paper>
         </Box>
