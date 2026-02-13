@@ -53,6 +53,7 @@ interface TopDiagnosisChartProps {
   poliType: PoliType;
   targetMonth: string;
   targetYear: string;
+  onDataReady?: (data: Array<{name: string; count: number}>) => void;
 }
 
 export default function TopDiagnosisChart({
