@@ -70,3 +70,11 @@ export const isWithinOperationalHours = (): boolean => {
   return true;
 };
 
+export const getLocalDateISO = (): string => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const localDate = new Date(now.getTime() - offset);
+  return localDate.toISOString().split("T")[0];
+};
+
+

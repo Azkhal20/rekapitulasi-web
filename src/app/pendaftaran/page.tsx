@@ -28,7 +28,7 @@ import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { patientService, PoliType, PatientData } from "@/services/patientService";
-import { getCurrentSheetName, isWithinOperationalHours, formatDateForSheet } from "@/utils/dateUtils";
+import { getCurrentSheetName, isWithinOperationalHours, formatDateForSheet, getLocalDateISO } from "@/utils/dateUtils";
 import { useAutoCalculate } from "@/hooks/useAutoCalculate";
 
 export default function PendaftaranPage() {
@@ -47,44 +47,77 @@ export default function PendaftaranPage() {
     NIP: "",
   });
 
-  const today = new Date().toISOString().split("T")[0];
-  const { autoValues, isCalculating } = useAutoCalculate(today, poliType, step === 2);
+  const [today, setToday] = useState("");
 
   useEffect(() => {
-    // Check operational hours initially
+    // Get local date string for initial load
+    setToday(getLocalDateISO());
+    
+    // Check operational hours
     if (!isWithinOperationalHours()) {
       setIsClosed(true);
     }
   }, []);
 
+  const { autoValues, isCalculating } = useAutoCalculate(today, poliType, step === 2 && !!today);
+
   const handlePoliSelect = (type: PoliType) => {
     setPoliType(type);
     setStep(2);
+    // Refresh date just in case
+    setToday(getLocalDateISO());
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (error) setError(null); // Clear error when typing
+  };
+
+  const validateForm = () => {
+    if (!formData.NAMA.trim()) {
+      setError("Nama Lengkap wajib diisi sesuai identitas Anda.");
+      return false;
+    }
+    if (formData.NAMA.trim().length < 3) {
+      setError("Nama Lengkap terlalu pendek. Mohon isi nama lengkap Anda.");
+      return false;
+    }
+    if (!formData.USIA.trim()) {
+      setError("Usia wajib diisi untuk keperluan rekam medis.");
+      return false;
+    }
+    const usiaNum = parseInt(formData.USIA);
+    if (isNaN(usiaNum) || usiaNum <= 0 || usiaNum > 120) {
+      setError("Mohon masukkan usia yang valid.");
+      return false;
+    }
+    if (!formData.NIP.trim()) {
+      setError("NIP atau NIK wajib diisi. (Gunakan NIK jika Anda bukan karyawan).");
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final check for operational hours
     if (!isWithinOperationalHours()) {
       setIsClosed(true);
       return;
     }
 
-    if (!formData.NAMA || !formData.USIA || !formData.NIP) {
-      setError("Mohon lengkapi semua data wajib.");
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
       setError(null);
 
+      const finalToday = getLocalDateISO(); // Recalculate just before submit
+
       // Prepare final patient data with all required columns
       const finalData: Omit<PatientData, "id"> = {
-        TANGGAL: formatDateForSheet(today),
+        TANGGAL: formatDateForSheet(finalToday),
         TAHUN: autoValues.TAHUN,
         BULAN: autoValues.BULAN,
         HARI: autoValues.HARI,
@@ -93,9 +126,9 @@ export default function PendaftaranPage() {
         P: formData.JENIS_KELAMIN === "P" ? autoValues.P : "",
         BARU: formData.JENIS_PASIEN === "BARU" ? "1" : "",
         LAMA: formData.JENIS_PASIEN === "LAMA" ? "1" : "",
-        NAMA: formData.NAMA.toUpperCase(),
-        USIA: formData.USIA,
-        NIP: formData.NIP,
+        NAMA: formData.NAMA.toUpperCase().trim(),
+        USIA: formData.USIA.trim(),
+        NIP: formData.NIP.trim(),
         OBS_TTV: "",
         KELUHAN: "",
         DIAGNOSIS: "",
@@ -110,7 +143,7 @@ export default function PendaftaranPage() {
       setStep(3);
     } catch (err) {
       console.error("Pendaftaran error:", err);
-      setError("Terjadi kesalahan saat menyimpan data. Silakan coba lagi.");
+      setError("Terjadi kendala koneksi saat menyimpan data. Pastikan internet Anda stabil dan coba lagi.");
     } finally {
       setLoading(false);
     }
