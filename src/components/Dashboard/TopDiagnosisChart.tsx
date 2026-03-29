@@ -74,26 +74,19 @@ export default function TopDiagnosisChart({
         let countP = 0;
 
         patients.forEach((p) => {
-          // Diagnosis - Improved multi-entry parsing
+          // Diagnosis - Handle multi-entry numbering (e.g., "1. Diag A 2. Diag B")
           const rawDiag = p.DIAGNOSIS || "";
-          if (rawDiag.trim() !== "" && rawDiag !== "-") {
-            // 1. Split by numbering pattern (e.g., "1. Diag1 2. Diag2") or newline
-            // This handles "1. Text \n 2. Text" or "1. Text 2. Text"
+          if (rawDiag && rawDiag !== "-" && rawDiag.trim() !== "") {
+            // Pecah berdasarkan pola penomoran "1. ", "2. ", dst atau baris baru
             const parts = rawDiag
               .split(/\d+\.\s+/)
-              .map((part) => part.trim())
-              .filter((part) => part !== "");
+              .map((p) => p.trim())
+              .filter((p) => p !== "");
 
             parts.forEach((part) => {
-              // 2. Clean data: Split by "." to remove tooth numbers/extra info
-              // e.g., "Gangren pulpa.18" -> "Gangren pulpa"
-              let cleanName = part.split(".")[0].trim();
-
-              // Extra cleanup: remove trailing numbers or simple tooth codes
-              // if they didn't use a dot (e.g., "Gangren pulpa 18")
-              // But strictly follow user's "." suggestion first
+              // Simpan sebagai satu diagnosa utuh (termasuk titik/keterangan gigi) sesuai permintaan user
+              const cleanName = part.toUpperCase();
               if (cleanName) {
-                cleanName = cleanName.toUpperCase();
                 diagnosisCounts[cleanName] =
                   (diagnosisCounts[cleanName] || 0) + 1;
               }
