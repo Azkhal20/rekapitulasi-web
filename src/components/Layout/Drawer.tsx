@@ -15,7 +15,6 @@ import {
   Typography,
   Collapse,
   Box,
-  Divider,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
@@ -25,7 +24,7 @@ import SummarizeIcon from "@mui/icons-material/Summarize";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 
 const openedMixin = (theme: Theme, drawerWidth: number): CSSObject => ({
@@ -74,7 +73,26 @@ const StyledDrawer = styled(MuiDrawer, {
   }),
 }));
 
-const menuItems = [
+import React from "react";
+
+interface TopMenuItem {
+  text: string;
+  icon: React.ReactNode;
+  href?: string;
+  children?: {
+    text: string;
+    icon: React.ReactNode;
+    href: string;
+  }[];
+}
+
+interface MenuSection {
+  header: string;
+  requiredRole?: string;
+  items: TopMenuItem[];
+}
+
+const menuItems: MenuSection[] = [
   {
     header: "BERANDA",
     items: [
