@@ -7,6 +7,8 @@ interface AutoValues {
   BULAN: string;
   HARI: string;
   ENAM_BELAS_LIMA_BELAS: string;
+  L: string;
+  P: string;
 }
 
 export const useAutoCalculate = (tanggal: string, poliType: PoliType, open: boolean) => {
@@ -15,6 +17,8 @@ export const useAutoCalculate = (tanggal: string, poliType: PoliType, open: bool
     BULAN: "",
     HARI: "",
     ENAM_BELAS_LIMA_BELAS: "",
+    L: "",
+    P: "",
   });
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -125,12 +129,31 @@ export const useAutoCalculate = (tanggal: string, poliType: PoliType, open: bool
         if (recordsInCycle.length > 0) {
           const maxVal = Math.max(
             ...recordsInCycle.map((r) => {
-              const rawVal = r["16-15"] || r.ENAM_BELAS_LIMA_BELAS || "0";
+              const row = r as Record<string, any>;
+              const rawVal = row["16-15"] || row.ENAM_BELAS_LIMA_BELAS || "0";
               const val = parseInt(String(rawVal));
               return isNaN(val) ? 0 : val;
             })
           );
           next1615 = maxVal + 1;
+        }
+
+        // 5. Gender Cumulative Counters (L/P)
+        // Find last non-empty L and P in currPatients
+        let lastLVal = 0;
+        let lastPVal = 0;
+
+        if (currPatients.length > 0) {
+          // Find max value in L column (it's a running count)
+          const lValues = currPatients
+            .map(p => parseInt(String(p.L || "0")))
+            .filter(v => !isNaN(v));
+          if (lValues.length > 0) lastLVal = Math.max(...lValues);
+
+          const pValues = currPatients
+            .map(p => parseInt(String(p.P || "0")))
+            .filter(v => !isNaN(v));
+          if (pValues.length > 0) lastPVal = Math.max(...pValues);
         }
 
         if (isMounted) {
@@ -139,6 +162,8 @@ export const useAutoCalculate = (tanggal: string, poliType: PoliType, open: bool
             BULAN: nextBulan.toString(),
             HARI: nextHari.toString(),
             ENAM_BELAS_LIMA_BELAS: next1615.toString(),
+            L: (lastLVal + 1) .toString(),
+            P: (lastPVal + 1).toString(),
           });
         }
       } catch (e) {

@@ -89,8 +89,8 @@ export default function PendaftaranPage() {
         BULAN: autoValues.BULAN,
         HARI: autoValues.HARI,
         ENAM_BELAS_LIMA_BELAS: autoValues.ENAM_BELAS_LIMA_BELAS,
-        L: formData.JENIS_KELAMIN === "L" ? "1" : "",
-        P: formData.JENIS_KELAMIN === "P" ? "1" : "",
+        L: formData.JENIS_KELAMIN === "L" ? autoValues.L : "",
+        P: formData.JENIS_KELAMIN === "P" ? autoValues.P : "",
         BARU: formData.JENIS_PASIEN === "BARU" ? "1" : "",
         LAMA: formData.JENIS_PASIEN === "LAMA" ? "1" : "",
         NAMA: formData.NAMA.toUpperCase(),
@@ -314,7 +314,7 @@ export default function PendaftaranPage() {
         {/* Footer */}
         <Box sx={{ mt: 6, textAlign: "center", opacity: 0.6 }}>
           <Typography variant="caption" color="text.secondary" fontWeight="600">
-            &copy; 2026 RSUD — Sistem Pendaftaran Mandiri
+            &copy; 2026 Poli Klinik Badan Kepegawaian Negara
           </Typography>
         </Box>
       </Container>
