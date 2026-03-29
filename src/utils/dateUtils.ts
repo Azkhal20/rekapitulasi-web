@@ -61,8 +61,12 @@ export const getCurrentSheetName = (): string => {
 };
 
 export const isWithinOperationalHours = (): boolean => {
-  const now = new Date();
-  const hours = now.getHours();
-  // Jam 08:00 - 16:00
-  return hours >= 8 && hours < 16;
+  // const now = new Date();
+  // const hours = now.getHours();
+  // // Jam 08:00 - 16:00
+  // return hours >= 8 && hours < 16;
+
+  // TEMPORARY: Always return true for manual testing
+  return true;
 };
+
