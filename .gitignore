@@ -43,4 +43,6 @@ next-env.d.ts
 # apps script
 bin/node.exe
 run-app.bat
+*.gs
+
 

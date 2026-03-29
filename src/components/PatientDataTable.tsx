@@ -120,8 +120,6 @@ export default function PatientDataTable({
   const { addMutation, updateMutation, deleteBulkMutation } =
     usePatientMutations(sheetName, poliType);
 
-  const [nextTahun, setNextTahun] = useState<string>("1");
-
   // Ambil nama kolom dari baris data pertama
   const columns = useMemo(() => {
     if (data.length === 0) return [];
@@ -502,27 +500,6 @@ export default function PatientDataTable({
 
   // Handler CRUD
   const handleAddPatient = () => {
-    // LOGIKA: Ambil nomor urut terakhir + 1
-    let nextNum = "1";
-    if (data.length > 0) {
-      // Sort berdasarkan ID descending untuk dapat entry terakhir
-      const sorted = [...data].sort((a, b) => {
-        const idA = Number((a as Record<string, unknown>).id) || 0;
-        const idB = Number((b as Record<string, unknown>).id) || 0;
-        return idB - idA;
-      });
-      const lastEntry = sorted[0] as Record<string, unknown>;
-
-      const lastTahun = lastEntry.TAHUN;
-
-      if (lastEntry && lastTahun) {
-        const lastVal = parseInt(String(lastTahun));
-        if (!isNaN(lastVal)) {
-          nextNum = (lastVal + 1).toString();
-        }
-      }
-    }
-    setNextTahun(nextNum);
     setFormMode("add");
     setSelectedPatient(null);
     setFormDialogOpen(true);
@@ -560,7 +537,6 @@ export default function PatientDataTable({
   }, [data]);
 
   const handleEditPatient = (patient: Patient | PatientData) => {
-    setNextTahun("");
     setFormMode("edit");
 
     const p = patient as Record<string, unknown>;
@@ -664,9 +640,35 @@ export default function PatientDataTable({
       payload["TINDAKAN "] = formData.TINDAKAN || "";
 
       if (formMode === "add") {
-        await addMutation.mutateAsync(
-          payload as unknown as Omit<PatientData, "id">,
-        );
+        let targetSheet: string | undefined = undefined;
+        try {
+          // Calculate dynamically based on the input date
+          const date = parseLocalDate(formData.TANGGAL || "");
+          if (!isNaN(date.getTime())) {
+            const MONTHS = [
+              "JANUARI",
+              "FEBRUARI",
+              "MARET",
+              "APRIL",
+              "MEI",
+              "JUNI",
+              "JULI",
+              "AGUSTUS",
+              "SEPTEMBER",
+              "OKTOBER",
+              "NOVEMBER",
+              "DESEMBER",
+            ];
+            targetSheet = `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+          }
+        } catch (e) {
+          console.error("Failed to parse target sheet from date", e);
+        }
+
+        await addMutation.mutateAsync({
+          data: payload as unknown as Omit<PatientData, "id">,
+          targetSheet,
+        });
 
         Swal.close();
         Toast.fire({
@@ -1482,10 +1484,9 @@ export default function PatientDataTable({
         onSubmit={handleFormSubmit}
         initialData={selectedPatient}
         mode={formMode}
-        defaultTahun={nextTahun}
-        existingPatients={data} // Pass all data for calculation
         lastL={lastL}
         lastP={lastP}
+        poliType={poliType}
       />
     </Box>
   );

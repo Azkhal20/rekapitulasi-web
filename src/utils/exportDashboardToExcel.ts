@@ -1,5 +1,13 @@
 import ExcelJS from "exceljs";
 
+import {
+  ReferralExportData,
+  ReferralGroupData,
+  ReferralField,
+  ReferralMonthData,
+  ReferralStats
+} from "../components/Dashboard/ReferralSummary";
+
 interface DashboardExportData {
   month: string;
   year: string;
@@ -31,6 +39,8 @@ interface DashboardExportData {
   }>;
   // Selected Poli
   selectedPoli: "umum" | "gigi";
+  // Referral Data
+  referralData?: ReferralExportData | null;
 }
 
 export async function exportDashboardToExcel(data: DashboardExportData) {
@@ -493,6 +503,118 @@ export async function exportDashboardToExcel(data: DashboardExportData) {
     sheet3.getColumn(2).width = 18;
     sheet3.getColumn(3).width = 15;
     sheet3.getColumn(4).width = 15;
+  }
+
+  // ===== SHEET 4: TOTAL RUJUKAN (GABUNGAN, UMUM, GIGI) =====
+  // ===== SHEET 4: TOTAL RUJUKAN (GABUNGAN, UMUM, GIGI) =====
+  if (data.referralData) {
+    const renderReferralSheet = (sheetName: string, ref: ReferralGroupData, color: string) => {
+      const sheet = workbook.addWorksheet(sheetName, {
+        views: [{ showGridLines: false }],
+      });
+
+      let currentRow = 1;
+      const colCount = 2 + ref.fields.length * 2 + 1;
+      const lastColLetter = String.fromCharCode(64 + colCount);
+
+      // Title
+      sheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      const title = sheet.getCell(`A${currentRow}`);
+      title.value = `REKAPITULASI RUJUKAN (${sheetName.toUpperCase()}) TAHUN ${ref.year}`;
+      title.font = { name: "Segoe UI", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      title.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: color },
+      };
+      title.alignment = { vertical: "middle", horizontal: "center" };
+      sheet.getRow(currentRow).height = 30;
+      currentRow++;
+
+      // Table Header Row 1
+      const header1 = sheet.getRow(currentRow);
+      const h1Values = ["NO", "BULAN"];
+      ref.fields.forEach((f: ReferralField) => {
+        h1Values.push(f.label, "");
+      });
+      h1Values.push("TOTAL");
+      header1.values = h1Values;
+
+      // Merge and style
+      sheet.mergeCells(`A${currentRow}:A${currentRow + 1}`);
+      sheet.mergeCells(`B${currentRow}:B${currentRow + 1}`);
+      ref.fields.forEach((_: ReferralField, i: number) => {
+        const startCol = 3 + i * 2;
+        const startLetter = String.fromCharCode(64 + startCol);
+        const endLetter = String.fromCharCode(64 + startCol + 1);
+        sheet.mergeCells(`${startLetter}${currentRow}:${endLetter}${currentRow}`);
+      });
+      sheet.mergeCells(`${lastColLetter}${currentRow}:${lastColLetter}${currentRow + 1}`);
+
+      header1.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+      header1.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF475569" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+      currentRow++;
+
+      // Row 2
+      const header2 = sheet.getRow(currentRow);
+      const h2Values = ["", ""];
+      ref.fields.forEach(() => h2Values.push("PB", "PL"));
+      header2.values = h2Values;
+      header2.font = { name: "Segoe UI", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+      header2.eachCell((cell) => {
+        if (cell.value) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF64748B" } };
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+        }
+      });
+      currentRow++;
+
+      // Data Rows
+      ref.tableData.forEach((row: ReferralMonthData, idx: number) => {
+        const r = sheet.getRow(currentRow);
+        const values = [idx + 1, row.month];
+        row.stats.forEach((s: ReferralStats) => values.push(s.pb, s.pl));
+        values.push(row.total);
+        r.values = values;
+        r.font = { name: "Segoe UI", size: 10 };
+        r.getCell(1).alignment = { horizontal: "center" };
+        r.getCell(colCount).font = { bold: true };
+        
+        if (idx % 2 === 1) {
+          r.eachCell((cell) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFAFAFA" } };
+          });
+        }
+        currentRow++;
+      });
+
+      // Grand Totals
+      const gRow = sheet.getRow(currentRow);
+      const gValues: (string | number)[] = ["", `TOTAL TAHUN ${ref.year}`];
+      ref.grandTotals.totals.forEach((t: { pb: number; pl: number }) => gValues.push(t.pb, t.pl));
+      gValues.push(ref.grandTotals.absoluteTotal);
+      gRow.values = gValues;
+      sheet.mergeCells(`A${currentRow}:B${currentRow}`);
+      gRow.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+      gRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
+        cell.alignment = { horizontal: "center" };
+      });
+      gRow.getCell(1).alignment = { horizontal: "left" };
+
+      // Column Widths
+      sheet.getColumn(1).width = 5;
+      sheet.getColumn(2).width = 15;
+      for (let i = 3; i < colCount; i++) sheet.getColumn(i).width = 7;
+      sheet.getColumn(colCount).width = 10;
+    };
+
+    renderReferralSheet("Rujukan Gabungan", data.referralData.combined, "FF4F46E5");
+    renderReferralSheet("Rujukan Umum", data.referralData.umum, "FF0D9488");
+    renderReferralSheet("Rujukan Gigi", data.referralData.gigi, "FFDB2777");
   }
 
   // Generate and download

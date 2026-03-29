@@ -51,42 +51,21 @@ export default function PoliPage() {
   const [error, setError] = useState<string | null>(null);
 
   // State for selected month and year, defaults to current date
-  const [selectedMonth, setSelectedMonth] = useState<string>(
-    new Date().toLocaleDateString("id-ID", { month: "long" }).toUpperCase()
-  );
-  const [selectedYear, setSelectedYear] = useState<string>(
-    new Date().getFullYear().toString()
-  );
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    return MONTHS[new Date().getMonth()];
+  });
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    return new Date().getFullYear().toString();
+  });
 
   // Mark as loaded immediately since we don't wait for localStorage anymore
   useEffect(() => {
-    // 1. Load Last Selected Month if valid
-    const lastMonth = localStorage.getItem(`poli_${poliType}_month`);
-    if (lastMonth && MONTHS.includes(lastMonth)) {
-      setSelectedMonth(lastMonth);
-    }
-
-    // 2. Load Last Selected Year if valid
-    const lastYear = localStorage.getItem(`poli_${poliType}_year`);
-    if (lastYear && YEARS.includes(lastYear)) {
-      setSelectedYear(lastYear);
-    }
-
+    // Start with current month and year instead of persisted
     setIsStorageLoaded(true);
   }, [poliType]);
 
-  // Save ke localStorage setiap kali month atau year berubah
-  useEffect(() => {
-    if (isStorageLoaded && selectedMonth) {
-      localStorage.setItem(`poli_${poliType}_month`, selectedMonth);
-    }
-  }, [selectedMonth, poliType, isStorageLoaded]);
-
-  useEffect(() => {
-    if (isStorageLoaded && selectedYear) {
-      localStorage.setItem(`poli_${poliType}_year`, selectedYear);
-    }
-  }, [selectedYear, poliType, isStorageLoaded]);
+  // Save selected poli if needed in the future, but we are removing month/year persistence.
+  // We keep isStorageLoaded to maintain existing flow without breaking dependencies.
 
   const loadData = useCallback(async () => {
     try {
