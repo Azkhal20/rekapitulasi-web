@@ -30,6 +30,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { patientService, PoliType, PatientData } from "@/services/patientService";
 import { getCurrentSheetName, isWithinOperationalHours, formatDateForSheet, getLocalDateISO } from "@/utils/dateUtils";
 import { useAutoCalculate } from "@/hooks/useAutoCalculate";
+import { toTitleCase } from "@/utils/stringUtils";
 
 export default function PendaftaranPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Poli, 2: Form, 3: Success
@@ -126,7 +127,7 @@ export default function PendaftaranPage() {
         P: formData.JENIS_KELAMIN === "P" ? autoValues.P : "",
         BARU: formData.JENIS_PASIEN === "BARU" ? "1" : "",
         LAMA: formData.JENIS_PASIEN === "LAMA" ? "1" : "",
-        NAMA: formData.NAMA.toUpperCase().trim(),
+        NAMA: toTitleCase(formData.NAMA.trim()),
         USIA: formData.USIA.trim(),
         NIP: formData.NIP.trim(),
         OBS_TTV: "",
