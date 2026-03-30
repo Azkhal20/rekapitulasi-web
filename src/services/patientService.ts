@@ -4,7 +4,8 @@ export interface PatientData {
   TAHUN: string;
   BULAN: string;
   HARI: string;
-  ENAM_BELAS_LIMA_BELAS: string;
+  "16-15"?: string;
+  ENAM_BELAS_LIMA_BELAS?: string;
   L: string;
   P: string;
   BARU: string;

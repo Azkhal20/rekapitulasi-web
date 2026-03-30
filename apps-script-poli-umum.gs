@@ -40,63 +40,51 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
   const lock = LockService.getScriptLock();
   lock.tryLock(10000);
   try {
     const action = e.parameter.action;
-    let data = {};
+    let payload = {};
     if (e.postData && e.postData.contents) {
       try {
-        data = JSON.parse(e.postData.contents);
-      } catch (err) {
-        return errorResponse("Invalid JSON format");
-      }
+        payload = JSON.parse(e.postData.contents);
+      } catch (err) {}
     }
 
-    // AUTHENTICATION
+    const data = { ...e.parameter, ...payload };
+
+    // 1. Auth & Profiles (Independent of Sheets)
     if (action === "login") return successResponse(handleLogin(data));
     if (action === "register") return successResponse(handleRegister(data));
-    if (action === "updateProfile")
-      return successResponse(handleUpdateProfile(data));
-    if (action === "updatePassword")
-      return successResponse(handleUpdatePassword(data));
-
-    // USER MANAGEMENT (SUPER ADMIN)
     if (action === "getUsers") return successResponse(getAllUsers());
-    if (action === "saveUser") return successResponse(saveUser(data)); // Handles Add & Update
+    if (action === "saveUser") return successResponse(saveUser(data));
     if (action === "deleteUser") return successResponse(deleteUser(data));
+    if (action === "updateProfile") return successResponse(handleUpdateProfile(data));
+    if (action === "updatePassword") return successResponse(handleUpdatePassword(data));
 
-    return handleRequest(e);
+    // 2. Patient Data CRUD (Requires Sheet)
+    let sheetName = data.sheetName || "JANUARI 2026";
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return errorResponse("Sheet '" + sheetName + "' tidak ditemukan.");
+
+    if (action === "getAll") return getAllPatients(sheet);
+    if (action === "add") return addPatient(sheet, data);
+    if (action === "update") return updatePatient(sheet, data);
+    if (action === "delete") return deletePatient(sheet, data);
+    if (action === "deleteBulk") return deleteBulkPatients(sheet, data);
+
+    return errorResponse("Action '" + action + "' tidak dikenali.");
   } catch (error) {
     return errorResponse(error.toString());
   } finally {
     lock.releaseLock();
   }
 }
-
-function handleRequest(e) {
-  try {
-    const action = e.parameter.action;
-    let sheetName = e.parameter.sheetName || "JANUARI 2026";
-
-    let body = {};
-    if (e.postData && e.postData.contents) {
-      try {
-        body = JSON.parse(e.postData.contents);
-        if (body.sheetName) sheetName = body.sheetName;
-      } catch (err) {}
-    }
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(sheetName);
-    if (!sheet)
-      return errorResponse("Sheet '" + sheetName + "' tidak ditemukan.");
-
-    if (action === "getAll") return getAllPatients(sheet);
-    if (action === "add") return addPatient(sheet, body);
-    if (action === "update") return updatePatient(sheet, body);
-    if (action === "delete") return deletePatient(sheet, body);
-    if (action === "deleteBulk") return deleteBulkPatients(sheet, body);
 
     return getAllPatients(sheet);
   } catch (err) {
@@ -156,25 +144,32 @@ function deleteBulkPatients(sheet, data) {
 
 // AUTH FUNCTIONS
 function handleLogin(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false, message: "Tab 'Users' tidak ditemukan" };
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0];
-  const uCol = headers.indexOf("USERNAME"),
-    pCol = headers.indexOf("PASSWORD"),
-    rCol = headers.indexOf("ROLE"),
-    nCol = headers.indexOf("NAMA_LENGKAP");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab 'USERS' tidak ditemukan" };
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "Data pengguna kosong" };
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = values[0].map(h => String(h).toUpperCase().trim());
+  
+  const uCol = headers.findIndex(h => h.includes("USERNAME")),
+    pCol = headers.findIndex(h => h.includes("PASSWORD")),
+    rCol = headers.findIndex(h => h.includes("ROLE")),
+    nCol = headers.findIndex(h => h.includes("NAMA_LENGKAP"));
+
+  if (uCol === -1 || pCol === -1) return { success: false, message: "Header kolom USERNAME atau PASSWORD tidak ditemukan" };
+
   for (let i = 1; i < values.length; i++) {
     if (
-      values[i][uCol] === data.username &&
-      values[i][pCol] === data.password
+      String(values[i][uCol]).trim() === String(data.username).trim() &&
+      String(values[i][pCol]).trim() === String(data.password).trim()
     ) {
       return {
         success: true,
         user: {
           USERNAME: values[i][uCol],
-          ROLE: values[i][rCol],
-          NAMA_LENGKAP: values[i][nCol],
+          ROLE: values[i][rCol] || "admin",
+          NAMA_LENGKAP: values[i][nCol] || values[i][uCol],
         },
       };
     }
@@ -183,8 +178,9 @@ function handleLogin(data) {
 }
 
 function handleRegister(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false, message: "Tab 'Users' tidak ditemukan" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab 'USERS' tidak ditemukan" };
   sheet.appendRow([
     data.username,
     data.password,
@@ -195,7 +191,8 @@ function handleRegister(data) {
 }
 
 function handleUpdateProfile(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   const values = sheet.getDataRange().getValues();
   const uCol = values[0].indexOf("USERNAME"),
     nCol = values[0].indexOf("NAMA_LENGKAP");
@@ -208,7 +205,8 @@ function handleUpdateProfile(data) {
 }
 
 function handleUpdatePassword(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   const values = sheet.getDataRange().getValues();
   const uCol = values[0].indexOf("USERNAME"),
     pCol = values[0].indexOf("PASSWORD");
@@ -226,65 +224,75 @@ function handleUpdatePassword(data) {
 
 // USER MANAGEMENT FUNCTIONS
 function getAllUsers() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const uCol = headers.indexOf("USERNAME");
-  const pCol = headers.indexOf("PASSWORD");
-  const rCol = headers.indexOf("ROLE");
-  const nCol = headers.indexOf("NAMA_LENGKAP");
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = data[0].map(h => String(h).toUpperCase().replace(/\W/g, "").trim());
+  
+  const uCol = headers.findIndex(h => h === "USERNAME"),
+        pCol = headers.findIndex(h => h === "PASSWORD"),
+        rCol = headers.findIndex(h => h === "ROLE"),
+        nCol = headers.findIndex(h => h === "NAMALENGKAP");
 
   const users = [];
   for (let i = 1; i < data.length; i++) {
+    const username = data[i][uCol];
+    if (!username) continue;
     users.push({
       id: i + 1,
-      username: data[i][uCol],
+      username: username,
       password: data[i][pCol],
-      role: data[i][rCol],
-      fullName: data[i][nCol],
+      role: data[i][rCol] || "admin",
+      fullName: data[i][nCol] || username,
     });
   }
   return users;
 }
 
 function saveUser(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false, message: "Tab Users missing" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab USERS missing" };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toUpperCase().replace(/\W/g, "").trim());
+
+  const uIdx = headers.findIndex(h => h === "USERNAME"),
+        pIdx = headers.findIndex(h => h === "PASSWORD"),
+        rIdx = headers.findIndex(h => h === "ROLE"),
+        nIdx = headers.findIndex(h => h === "NAMALENGKAP");
 
   if (data.id) {
-    // Update
     const row = parseInt(data.id);
-    const headers = sheet
-      .getRange(1, 1, 1, sheet.getLastColumn())
-      .getValues()[0];
-    const uCol = headers.indexOf("USERNAME") + 1;
-    const pCol = headers.indexOf("PASSWORD") + 1;
-    const rCol = headers.indexOf("ROLE") + 1;
-    const nCol = headers.indexOf("NAMA_LENGKAP") + 1;
-
-    if (data.username) sheet.getRange(row, uCol).setValue(data.username);
-    if (data.password) sheet.getRange(row, pCol).setValue(data.password);
-    if (data.role) sheet.getRange(row, rCol).setValue(data.role);
-    if (data.fullName) sheet.getRange(row, nCol).setValue(data.fullName);
+    if (data.username && uIdx !== -1) sheet.getRange(row, uIdx + 1).setValue(data.username);
+    if (data.password && pIdx !== -1) sheet.getRange(row, pIdx + 1).setValue(data.password);
+    if (data.role && rIdx !== -1) sheet.getRange(row, rIdx + 1).setValue(data.role);
+    if (data.fullName && nIdx !== -1) sheet.getRange(row, nIdx + 1).setValue(data.fullName);
     return { success: true, message: "User updated" };
   } else {
-    // Add New
-    const users = sheet.getDataRange().getValues();
-    const uIndex = users[0].indexOf("USERNAME");
-    for (let i = 1; i < users.length; i++) {
-      if (users[i][uIndex] === data.username) {
+    // Check duplication
+    const users = sheet.getRange(2, uIdx + 1, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < users.length; i++) {
+      if (String(users[i][0]).trim() === String(data.username).trim()) {
         return { success: false, message: "Username already exists" };
       }
     }
-    sheet.appendRow([data.username, data.password, data.role, data.fullName]);
+    // Prepare new row in correct order
+    const newRow = new Array(headers.length).fill("");
+    if (uIdx !== -1) newRow[uIdx] = data.username;
+    if (pIdx !== -1) newRow[pIdx] = data.password;
+    if (rIdx !== -1) newRow[rIdx] = data.role || "admin";
+    if (nIdx !== -1) newRow[nIdx] = data.fullName || data.username;
+    sheet.appendRow(newRow);
     return { success: true, message: "User added" };
   }
 }
 
 function deleteUser(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab USERS missing" };
   if (data.id) {
     sheet.deleteRow(parseInt(data.id));
     return { success: true, message: "User deleted" };
