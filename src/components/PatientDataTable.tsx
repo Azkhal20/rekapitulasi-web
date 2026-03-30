@@ -34,6 +34,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import EditIcon from "@mui/icons-material/Edit";
 import HistoryIcon from "@mui/icons-material/History";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import DeleteIcon from "@mui/icons-material/Delete";
 import CheckboxIcon from "@mui/icons-material/CheckBox";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
