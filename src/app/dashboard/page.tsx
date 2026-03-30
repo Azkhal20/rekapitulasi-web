@@ -30,9 +30,7 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import WcIcon from "@mui/icons-material/Wc";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import EventNoteIcon from "@mui/icons-material/EventNote";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import DownloadIcon from "@mui/icons-material/Download";
-import Link from "next/link";
 import TopDiagnosisChart from "@/components/Dashboard/TopDiagnosisChart";
 import {
   patientService,
@@ -82,7 +80,6 @@ export default function DashboardPage() {
     return new Date().getFullYear().toString();
   });
 
-  const [serverTime, setServerTime] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
   const [topDiagnosisData, setTopDiagnosisData] = useState<
     Array<{ name: string; count: number }>
@@ -91,25 +88,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Set initial time only on client
-    setServerTime(
-      new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-
-    // Optional: Update time every minute
-    const interval = setInterval(() => {
-      setServerTime(
-        new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    }, 60000);
-
-    return () => clearInterval(interval);
   }, []);
 
   const periodName = `${selectedMonth} ${selectedYear}`;
@@ -868,155 +846,26 @@ export default function DashboardPage() {
       {/* Main Analysis Section */}
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", xl: "2.5fr 1fr" },
-          gap: 3,
-          alignItems: "start",
+          mb: 5,
         }}
       >
-        {/* Left Col: Chart & Actions */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: "24px",
-              border: "1px solid #F1F5F9",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
-              overflow: "hidden",
-            }}
-          >
-            <TopDiagnosisChart
-              poliType={selectedPoli}
-              targetMonth={selectedMonth}
-              targetYear={selectedYear}
-              onDataReady={handleDiagnosisDataReady}
-            />
-          </Paper>
-        </Box>
-
-        {/* Right Col: Container Status & Akses Cepat */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: "24px",
-              border: "1px solid #F1F5F9",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              gap: 3,
-            }}
-          >
-            {/* Status Sistem Section */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight="800"
-                color="#64748B"
-                sx={{ textTransform: "uppercase", mb: 2, letterSpacing: 1 }}
-              >
-                Status Sistem
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                <Box
-                  sx={{
-                    p: 2,
-                    bgcolor: "#F0FDF4",
-                    borderRadius: "16px",
-                    border: "1px solid #BBF7D0",
-                  }}
-                >
-                  <Typography variant="body2" fontWeight="700" color="#166534">
-                    Backend Connected
-                  </Typography>
-                  <Typography variant="caption" color="#15803D">
-                    Google Sheets API V5 active
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    p: 2,
-                    bgcolor: "#F8FAFC",
-                    borderRadius: "16px",
-                    border: "1px solid #E2E8F0",
-                  }}
-                >
-                  <Typography variant="body2" fontWeight="700" color="primary">
-                    Waktu Server
-                  </Typography>
-                  <Typography variant="caption" color="#64748B">
-                    {serverTime || "..."} WIB
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-
-            <Divider />
-
-            {/* Akses Cepat Section */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight="800"
-                color="#64748B"
-                sx={{ textTransform: "uppercase", mb: 2, letterSpacing: 1 }}
-              >
-                Akses Cepat
-              </Typography>
-              <Box
-                component={Link}
-                href="/dashboard/patients"
-                sx={{
-                  p: 2.5,
-                  borderRadius: "16px",
-                  bgcolor: "#696CFF",
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    bgcolor: "#5F61E6",
-                    transform: "translateY(-2px)",
-                    boxShadow: "0 8px 15px rgba(105, 108, 255, 0.25)",
-                  },
-                }}
-              >
-                <Box display="flex" gap={2} alignItems="center">
-                  <Box
-                    sx={{
-                      p: 1,
-                      borderRadius: "10px",
-                      bgcolor: "rgba(255,255,255,0.2)",
-                      color: "white",
-                    }}
-                  >
-                    <PeopleIcon sx={{ fontSize: 20 }} />
-                  </Box>
-                  <Box>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="700"
-                      color="white"
-                    >
-                      Kelola Pasien
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "rgba(255,255,255,0.8)" }}
-                    >
-                      Input & Edit Data
-                    </Typography>
-                  </Box>
-                </Box>
-                <ArrowForwardIcon sx={{ color: "white", fontSize: 18 }} />
-              </Box>
-            </Box>
-          </Paper>
-        </Box>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: "24px",
+            border: "1px solid #F1F5F9",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+            overflow: "hidden",
+          }}
+        >
+          <TopDiagnosisChart
+            poliType={selectedPoli}
+            targetMonth={selectedMonth}
+            targetYear={selectedYear}
+            onDataReady={handleDiagnosisDataReady}
+          />
+        </Paper>
       </Box>
 
       {/* Ringkasan Gabungan (Umum & Gigi) */}

@@ -1,6 +1,6 @@
 /**
  * REKAPITULASI WEB - APPS SCRIPT POLI UMUM V8 (FINAL)
- * Fitur: Auth (Login/Register) + CRUD + Bulk Delete Pasien
+ * Fitur: Auth (Login/Register) + CRUD + Bulk Delete Pasien + User Management (Super Admin)
  * Total Kolom: 28 (A-AB)
  */
 
@@ -60,6 +60,11 @@ function doPost(e) {
       return successResponse(handleUpdateProfile(data));
     if (action === "updatePassword")
       return successResponse(handleUpdatePassword(data));
+
+    // USER MANAGEMENT (SUPER ADMIN)
+    if (action === "getUsers") return successResponse(getAllUsers());
+    if (action === "saveUser") return successResponse(saveUser(data)); // Handles Add & Update
+    if (action === "deleteUser") return successResponse(deleteUser(data));
 
     return handleRequest(e);
   } catch (error) {
@@ -133,7 +138,8 @@ function updatePatient(sheet, data) {
 }
 
 function deletePatient(sheet, data) {
-  sheet.deleteRow(parseInt(data.id));
+  const id = parseInt(data.id);
+  if (id >= 3) sheet.deleteRow(id);
   return successResponse({ message: "Data berhasil dihapus" });
 }
 
@@ -216,6 +222,74 @@ function handleUpdatePassword(data) {
     }
   }
   return { success: false, message: "Password lama salah" };
+}
+
+// USER MANAGEMENT FUNCTIONS
+function getAllUsers() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const uCol = headers.indexOf("USERNAME");
+  const pCol = headers.indexOf("PASSWORD");
+  const rCol = headers.indexOf("ROLE");
+  const nCol = headers.indexOf("NAMA_LENGKAP");
+
+  const users = [];
+  for (let i = 1; i < data.length; i++) {
+    users.push({
+      id: i + 1,
+      username: data[i][uCol],
+      password: data[i][pCol],
+      role: data[i][rCol],
+      fullName: data[i][nCol],
+    });
+  }
+  return users;
+}
+
+function saveUser(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab Users missing" };
+
+  if (data.id) {
+    // Update
+    const row = parseInt(data.id);
+    const headers = sheet
+      .getRange(1, 1, 1, sheet.getLastColumn())
+      .getValues()[0];
+    const uCol = headers.indexOf("USERNAME") + 1;
+    const pCol = headers.indexOf("PASSWORD") + 1;
+    const rCol = headers.indexOf("ROLE") + 1;
+    const nCol = headers.indexOf("NAMA_LENGKAP") + 1;
+
+    if (data.username) sheet.getRange(row, uCol).setValue(data.username);
+    if (data.password) sheet.getRange(row, pCol).setValue(data.password);
+    if (data.role) sheet.getRange(row, rCol).setValue(data.role);
+    if (data.fullName) sheet.getRange(row, nCol).setValue(data.fullName);
+    return { success: true, message: "User updated" };
+  } else {
+    // Add New
+    const users = sheet.getDataRange().getValues();
+    const uIndex = users[0].indexOf("USERNAME");
+    for (let i = 1; i < users.length; i++) {
+      if (users[i][uIndex] === data.username) {
+        return { success: false, message: "Username already exists" };
+      }
+    }
+    sheet.appendRow([data.username, data.password, data.role, data.fullName]);
+    return { success: true, message: "User added" };
+  }
+}
+
+function deleteUser(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  if (!sheet) return { success: false };
+  if (data.id) {
+    sheet.deleteRow(parseInt(data.id));
+    return { success: true, message: "User deleted" };
+  }
+  return { success: false, message: "Invalid ID" };
 }
 
 function successResponse(data) {

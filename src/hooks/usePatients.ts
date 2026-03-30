@@ -16,10 +16,17 @@ export const usePatientMutations = (sheetName: string, poliType: PoliType) => {
   const queryKey = ['patients', sheetName, poliType];
 
   const addMutation = useMutation({
-    mutationFn: (data: Omit<PatientData, 'id'>) => patientService.addPatient(data, sheetName, poliType),
-    onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey });
+    mutationFn: ({ data, targetSheet }: { data: Omit<PatientData, 'id'>; targetSheet?: string }) => 
+      patientService.addPatient(data, targetSheet || sheetName, poliType),
+    onSuccess: (_, args) => {
+      const actualSheet = args.targetSheet || sheetName;
+      // Invalidate the sheet where data was added
+      queryClient.invalidateQueries({ queryKey: ['patients', actualSheet, poliType] });
+      
+      // If added to a different sheet, also invalidate the current view just in case
+      if (actualSheet !== sheetName) {
+        queryClient.invalidateQueries({ queryKey });
+      }
     },
   });
 

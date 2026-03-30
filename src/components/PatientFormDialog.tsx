@@ -14,10 +14,6 @@ import {
   CircularProgress,
   Alert,
   Typography,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Autocomplete,
   createFilterOptions,
 } from "@mui/material";
@@ -25,8 +21,7 @@ import icd10Data from "@/data/icd10.json";
 import CloseIcon from "@mui/icons-material/Close";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import SendIcon from "@mui/icons-material/Send";
-import { PatientData } from "@/services/patientService";
-import { Patient } from "@/types/patient";
+import { PatientData, PoliType } from "@/services/patientService";
 
 interface PatientFormDialogProps {
   open: boolean;
@@ -34,10 +29,9 @@ interface PatientFormDialogProps {
   onSubmit: (data: Omit<PatientData, "id">) => Promise<void>;
   initialData?: PatientData | null;
   mode: "add" | "edit";
-  defaultTahun?: string;
-  existingPatients?: PatientData[] | Patient[]; // Use strict types if possible
   lastL?: string;
   lastP?: string;
+  poliType: PoliType;
 }
 
 interface ICD10Entry {
@@ -167,14 +161,21 @@ export default function PatientFormDialog({
   onSubmit,
   initialData,
   mode,
-  defaultTahun,
-  existingPatients = [],
   lastL = "",
   lastP = "",
+  poliType,
 }: PatientFormDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeReferralType, setActiveReferralType] = useState<string>("none");
+
+  // Separate states for computed auto values
+  const [autoValues, setAutoValues] = useState({
+    TAHUN: "",
+    BULAN: "",
+    HARI: "",
+    ENAM_BELAS_LIMA_BELAS: "",
+  });
 
   const [formData, setFormData] = useState<Omit<PatientData, "id">>({
     TANGGAL: "",
@@ -208,27 +209,88 @@ export default function PatientFormDialog({
     DIRUJUK_BALIK_FKRTL_PL: "",
   });
 
-  // Effect: Auto Calculate HARI, BULAN, and 16-15 when TANGGAL changes (Only in ADD mode)
+  // Effect: Auto Calculate Cross-Sheet Sequence values when TANGGAL changes (Only in ADD mode)
   useEffect(() => {
-    if (mode === "add" && formData.TANGGAL && open) {
+    let isMounted = true;
+
+    const fetchAndCalculate = async () => {
+      if (mode !== "add" || !formData.TANGGAL || !open) return;
+      setIsCalculating(true);
+
       try {
-        const inputDate = new Date(formData.TANGGAL);
-        if (isNaN(inputDate.getTime())) return;
+        const inputDate = parseDateFromSheet(formData.TANGGAL); // Converts to ISO YYYY-MM-DD reliably
+        if (!inputDate) return;
 
-        const day = inputDate.getDate();
-        const month = inputDate.getMonth();
-        const year = inputDate.getFullYear();
+        const dateObj = new Date(inputDate);
+        if (isNaN(dateObj.getTime())) return;
 
-        // Normalized Input Date String (YYYY-MM-DD from parser) to compare
-        const inputDateStr = formData.TANGGAL; // Assume clean ISO
+        const day = dateObj.getDate();
+        const monthIndex = dateObj.getMonth(); // 0 is Jan, 11 is Dec
+        const year = dateObj.getFullYear();
 
-        // Cast to any[] once to avoid union type issues with heterogeneous keys
-        const patients = (existingPatients as Record<string, unknown>[]) || [];
+        const MONTHS = [
+          "JANUARI",
+          "FEBRUARI",
+          "MARET",
+          "APRIL",
+          "MEI",
+          "JUNI",
+          "JULI",
+          "AGUSTUS",
+          "SEPTEMBER",
+          "OKTOBER",
+          "NOVEMBER",
+          "DESEMBER",
+        ];
 
-        // === 1. Auto Calc HARI (Reset per Hari) ===
-        const recordsSameDay = patients.filter((p) => {
+        const currentSheetName = `${MONTHS[monthIndex]} ${year}`;
+
+        // Determine previous month sheet (for TAHUN continuation and 16-15 cross-month)
+        let prevMonthIndex = monthIndex - 1;
+        let prevYear = year;
+        if (prevMonthIndex < 0) {
+          prevMonthIndex = 11;
+          prevYear = year - 1;
+        }
+        const prevSheetName = `${MONTHS[prevMonthIndex]} ${prevYear}`;
+
+        // 1. Fetch current month and previous month data silently.
+        // We will fetch current and previous sheets silently to guarantee the data is accurate across sheets
+        // bypassing the currently viewed sheet boundaries.
+
+        const fetchSilently = async (sName: string) => {
+          try {
+            const { patientService } =
+              await import("@/services/patientService");
+            return await patientService.getAllPatients(sName, poliType);
+          } catch {
+            return []; // Fails if sheet doesn't exist yet
+          }
+        };
+
+        const [currPatientsRaw, prevPatientsRaw] = await Promise.all([
+          fetchSilently(currentSheetName),
+          fetchSilently(prevSheetName),
+        ]);
+
+        if (!isMounted) return;
+
+        const currPatients = currPatientsRaw as unknown as Record<
+          string,
+          unknown
+        >[];
+        const prevPatients = prevPatientsRaw as unknown as Record<
+          string,
+          unknown
+        >[];
+
+        // Combine for 16-15 calc
+        const allRelevantPatients = [...prevPatients, ...currPatients];
+
+        // 1. HARI (Reset per Hari within current month)
+        const recordsSameDay = currPatients.filter((p) => {
           const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
-          return pDateIso === inputDateStr;
+          return pDateIso === inputDate;
         });
 
         let nextHari = 1;
@@ -239,12 +301,14 @@ export default function PatientFormDialog({
           nextHari = maxHari + 1;
         }
 
-        // === 2. Auto Calc BULAN (Reset per Bulan) ===
-        const recordsSameMonth = patients.filter((p) => {
+        // 2. BULAN (Reset per Bulan within current month)
+        const recordsSameMonth = currPatients.filter((p) => {
           const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
           if (!pDateIso) return false;
           const pDate = new Date(pDateIso);
-          return pDate.getFullYear() === year && pDate.getMonth() === month;
+          return (
+            pDate.getFullYear() === year && pDate.getMonth() === monthIndex
+          );
         });
 
         let nextBulan = 1;
@@ -257,31 +321,55 @@ export default function PatientFormDialog({
           nextBulan = maxBulan + 1;
         }
 
-        // === 3. Auto Calc 16-15 (Reset Tgl 16) ===
-        // Tentukan Awal Siklus (Cycle Start Date)
-        let cycleStartTime: number;
-
-        if (day >= 16) {
-          // Siklus bulan ini, mulai tanggal 16
-          cycleStartTime = new Date(year, month, 16).setHours(0, 0, 0, 0);
-        } else {
-          // Siklus bulan lalu, mulai tanggal 16 bulan lalu
-          cycleStartTime = new Date(year, month - 1, 16).setHours(0, 0, 0, 0);
+        // 3. TAHUN (Reset per Tahun, absolute count for the year)
+        // Look at current month first
+        let nextTahun = 1;
+        if (currPatients.length > 0) {
+          // find max TAHUN in current month
+          const maxTahunCurr = Math.max(
+            ...currPatients.map((r) => parseInt(String(r.TAHUN || "0")) || 0),
+          );
+          if (maxTahunCurr > 0) nextTahun = maxTahunCurr + 1;
         }
 
-        // Filter Existing Patients dalam siklus ini
-        const recordsInCycle = patients.filter((p) => {
+        if (nextTahun === 1 && prevPatients.length > 0 && monthIndex !== 0) {
+          // if current month is empty, and it is NOT january, continue from previous month's max TAHUN
+          const prevYearData = prevPatients.filter((p) => {
+            const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
+            if (!pDateIso) return false;
+            return new Date(pDateIso).getFullYear() === year; // only consider same year
+          });
+          if (prevYearData.length > 0) {
+            const maxTahunPrev = Math.max(
+              ...prevYearData.map((r) => parseInt(String(r.TAHUN || "0")) || 0),
+            );
+            if (maxTahunPrev > 0) nextTahun = maxTahunPrev + 1;
+          }
+        }
+
+        // 4. 16-15 (Reset Tgl 16 cross-month)
+        let cycleStartTime: number;
+        if (day >= 16) {
+          // cycle starts 16 current month
+          cycleStartTime = new Date(year, monthIndex, 16).setHours(0, 0, 0, 0);
+        } else {
+          // cycle starts 16 prev month
+          cycleStartTime = new Date(year, monthIndex - 1, 16).setHours(
+            0,
+            0,
+            0,
+            0,
+          );
+        }
+
+        const recordsInCycle = allRelevantPatients.filter((p) => {
           const pDateIso = parseDateFromSheet(String(p.TANGGAL || ""));
           if (!pDateIso) return false;
-
           const pDate = new Date(pDateIso);
           if (isNaN(pDate.getTime())) return false;
-
-          // Compare Time
           return pDate.setHours(0, 0, 0, 0) >= cycleStartTime;
         });
 
-        // Find Max Value in Cycle for 16-15
         let next1615 = 1;
         if (recordsInCycle.length > 0) {
           const maxVal = Math.max(
@@ -292,22 +380,27 @@ export default function PatientFormDialog({
             }),
           );
           next1615 = maxVal + 1;
-        } else {
-          next1615 = 1;
         }
 
-        // Update Form State (All fields at once to avoid flicker)
-        setFormData((prev) => ({
-          ...prev,
-          HARI: nextHari.toString(),
+        // Set Computed Auto Values correctly as Placeholders
+        setAutoValues({
+          TAHUN: nextTahun.toString(),
           BULAN: nextBulan.toString(),
+          HARI: nextHari.toString(),
           ENAM_BELAS_LIMA_BELAS: next1615.toString(),
-        }));
+        });
       } catch (e) {
         console.error("Auto calc error", e);
+      } finally {
+        if (isMounted) setIsCalculating(false);
       }
-    }
-  }, [formData.TANGGAL, mode, open, existingPatients]);
+    };
+
+    fetchAndCalculate();
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.TANGGAL, mode, open, poliType]);
 
   // Reset form
   useEffect(() => {
@@ -320,15 +413,6 @@ export default function PatientFormDialog({
           convertedData.TANGGAL = parseDateFromSheet(convertedData.TANGGAL);
         }
 
-        // Detect active referral type for dropdown
-        const found = REFERRAL_CATEGORIES.find(
-          (cat) =>
-            cat.value !== "none" &&
-            (String(initialData[cat.pb as keyof PatientData] || "") ||
-              String(initialData[cat.pl as keyof PatientData] || "")),
-        );
-        setActiveReferralType(found ? found.value : "none");
-
         setFormData({
           ...convertedData,
           BARU: String(initialData.BARU || ""),
@@ -338,15 +422,13 @@ export default function PatientFormDialog({
         // ADD Mode
         const now = new Date();
         const tanggal = now.toISOString().split("T")[0];
-        const tahun = defaultTahun || now.getFullYear().toString();
 
-        setActiveReferralType("none");
         setFormData({
           TANGGAL: tanggal,
-          TAHUN: tahun,
+          TAHUN: "", // Kept empty so AutoValues logic generates the placeholder
           BULAN: "",
           HARI: "",
-          ENAM_BELAS_LIMA_BELAS: "", // Auto-calc will fill this
+          ENAM_BELAS_LIMA_BELAS: "",
           L: "",
           P: "",
           BARU: "",
@@ -375,7 +457,7 @@ export default function PatientFormDialog({
       }
       setError(null);
     }
-  }, [open, initialData, mode, defaultTahun]);
+  }, [open, initialData, mode]);
 
   const handleChange = (
     field: keyof Omit<PatientData, "id">,
@@ -384,25 +466,20 @@ export default function PatientFormDialog({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleReferralTypeChange = (newType: string) => {
-    setFormData((prev) => {
-      const updated = { ...prev } as Record<string, string>;
-      // Reset all referral fields using type-safe keys
-      REFERRAL_CATEGORIES.forEach((cat) => {
-        if (cat.pb) updated[cat.pb] = "";
-        if (cat.pl) updated[cat.pl] = "";
-      });
-      return updated as unknown as Omit<PatientData, "id">;
-    });
-    setActiveReferralType(newType);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
       const dataToSubmit = { ...formData };
+
+      // Fallback to autoValues if field is empty (user didn't override placeholder)
+      if (!dataToSubmit.TAHUN) dataToSubmit.TAHUN = autoValues.TAHUN;
+      if (!dataToSubmit.BULAN) dataToSubmit.BULAN = autoValues.BULAN;
+      if (!dataToSubmit.HARI) dataToSubmit.HARI = autoValues.HARI;
+      if (!dataToSubmit.ENAM_BELAS_LIMA_BELAS)
+        dataToSubmit.ENAM_BELAS_LIMA_BELAS = autoValues.ENAM_BELAS_LIMA_BELAS;
+
       if (dataToSubmit.TANGGAL) {
         dataToSubmit.TANGGAL = formatDateForSheet(dataToSubmit.TANGGAL);
       }
@@ -492,18 +569,33 @@ export default function PatientFormDialog({
                 label="Tahun"
                 value={formData.TAHUN}
                 onChange={(e) => handleChange("TAHUN", e.target.value)}
-                helperText="*Auto +1"
+                helperText="*Auto akumulasi tahun"
+                placeholder={isCalculating ? "Tunggu..." : autoValues.TAHUN}
+                focused={mode === "add"}
+                InputProps={{
+                  endAdornment: isCalculating && <CircularProgress size={16} />,
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor:
+                      mode === "add" && !formData.TAHUN ? "#F0F9FF" : "inherit",
+                  },
+                }}
               />
               <TextField
                 label="Bulan"
                 value={formData.BULAN}
                 onChange={(e) => handleChange("BULAN", e.target.value)}
-                helperText="*Auto Reset /Bulan"
-                placeholder="Auto"
+                helperText="*Auto reset /bulan"
+                placeholder={isCalculating ? "Tunggu..." : autoValues.BULAN}
                 focused={mode === "add"}
+                InputProps={{
+                  endAdornment: isCalculating && <CircularProgress size={16} />,
+                }}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                    backgroundColor:
+                      mode === "add" && !formData.BULAN ? "#F0F9FF" : "inherit",
                   },
                 }}
               />
@@ -511,12 +603,16 @@ export default function PatientFormDialog({
                 label="Hari"
                 value={formData.HARI}
                 onChange={(e) => handleChange("HARI", e.target.value)}
-                helperText="*Auto Reset /Hari"
-                placeholder="Auto"
+                helperText="*Auto reset /hari"
+                placeholder={isCalculating ? "Tunggu..." : autoValues.HARI}
                 focused={mode === "add"}
+                InputProps={{
+                  endAdornment: isCalculating && <CircularProgress size={16} />,
+                }}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                    backgroundColor:
+                      mode === "add" && !formData.HARI ? "#F0F9FF" : "inherit",
                   },
                 }}
               />
@@ -526,11 +622,20 @@ export default function PatientFormDialog({
                 onChange={(e) =>
                   handleChange("ENAM_BELAS_LIMA_BELAS", e.target.value)
                 }
-                helperText="*Auto Reset Tanggal 16"
+                helperText="*Auto reset tgl 16"
+                placeholder={
+                  isCalculating ? "Tunggu..." : autoValues.ENAM_BELAS_LIMA_BELAS
+                }
                 focused={mode === "add"}
+                InputProps={{
+                  endAdornment: isCalculating && <CircularProgress size={16} />,
+                }}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    backgroundColor: mode === "add" ? "#F0F9FF" : "inherit",
+                    backgroundColor:
+                      mode === "add" && !formData.ENAM_BELAS_LIMA_BELAS
+                        ? "#F0F9FF"
+                        : "inherit",
                   },
                 }}
               />
@@ -695,22 +800,30 @@ export default function PatientFormDialog({
                       const currentDiag = prev.DIAGNOSIS;
                       const currentICD = prev.ICD10;
 
-                      // 1. Ambil diagnosis yang sudah ada (baris yang sudah memiliki nomor)
-                      const confirmedDiags = currentDiag
-                        .split("\n")
-                        .filter((line) => /^\d+\.\s+/.test(line.trim()))
-                        .map((line) => line.trim().replace(/^\d+\.\s+/, ""));
+                      // 1. Pecah menjadi baris-baris
+                      const lines = currentDiag.split("\n");
 
-                      // 2. Tambahkan data baru
-                      confirmedDiags.push(entry.DISPLAY);
+                      // 2. Ambil baris terakhir (tempat user sedang mengetik pencarian)
+                      const lastLine = lines.pop() || "";
 
-                      // 3. Rakit kembali diagnosis (tambah \n dan nomor berikutnya)
-                      const updatedDiag =
-                        confirmedDiags
-                          .map((d, i) => `${i + 1}. ${d}`)
-                          .join("\n") + `\n${confirmedDiags.length + 1}. `;
+                      // 3. Cek apakah baris terakhir sudah memiliki format nomor "X. "
+                      const match = lastLine.match(/^(\d+\.\s*)/);
 
-                      // 4. Update ICD-10 (tumpuk dengan koma)
+                      // Jika sudah ada nomornya, gunakan nomor itu.
+                      // Jika belum ada nomornya, berikan nomor lanjutan atau nomor 1
+                      const prefix = match
+                        ? match[1]
+                        : lines.length > 0
+                          ? `${lines.length + 1}. `
+                          : "1. ";
+
+                      // 4. Masukkan kembali baris tersebut dengan membuang term pengetikan (misal 'z0')
+                      lines.push(`${prefix}${entry.DISPLAY}`);
+
+                      // 5. Gabungkan kembali (tidak ditambah baris baru / nomor otomatis)
+                      const updatedDiag = lines.join("\n");
+
+                      // 6. Update ICD-10 (tumpuk dengan koma)
                       const existingCodes = currentICD
                         ? currentICD
                             .split(/,\s*/)
@@ -811,111 +924,66 @@ export default function PatientFormDialog({
             </Box>
 
             <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}>
-              <FormControl
-                fullWidth
-                sx={{ mb: activeReferralType !== "none" ? 2 : 0 }}
-              >
-                <InputLabel id="referral-type-label">
-                  Pilih Jenis Rujukan
-                </InputLabel>
-                <Select
-                  labelId="referral-type-label"
-                  value={activeReferralType}
-                  label="Pilih Jenis Rujukan"
-                  onChange={(e) => handleReferralTypeChange(e.target.value)}
-                  sx={{ borderRadius: "12px" }}
-                >
-                  {REFERRAL_CATEGORIES.map((cat) => (
-                    <MenuItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {activeReferralType !== "none" && (
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: "16px",
-                    bgcolor: "#F8FAFC",
-                    border: "1px solid #E2E8F0",
-                    animation: "fadeIn 0.3s ease-out",
-                    "@keyframes fadeIn": {
-                      from: { opacity: 0, transform: "translateY(-10px)" },
-                      to: { opacity: 1, transform: "translateY(0)" },
-                    },
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    fontWeight={700}
-                    sx={{ mb: 1.5, display: "block" }}
-                  >
-                    INPUT NILAI RUJUKAN (
-                    {
-                      REFERRAL_CATEGORIES.find(
-                        (c) => c.value === activeReferralType,
-                      )?.label
-                    }
-                    )
-                  </Typography>
-                  <Stack direction="row" spacing={2}>
-                    {(() => {
-                      const activeCat = REFERRAL_CATEGORIES.find(
-                        (c) => c.value === activeReferralType,
-                      );
-                      return (
-                        <>
-                          <TextField
-                            label="PB (Pasien Baru)"
-                            value={
-                              activeCat?.pb
-                                ? (formData[
-                                    activeCat.pb as keyof typeof formData
-                                  ] as string) || ""
-                                : ""
-                            }
-                            onChange={(e) =>
-                              activeCat?.pb &&
-                              handleChange(
-                                activeCat.pb as keyof typeof formData,
-                                e.target.value,
-                              )
-                            }
-                            fullWidth
-                            placeholder="Isi 1 jika pasien rujukan baru"
-                            focused
-                            size="small"
-                          />
-                          <TextField
-                            label="PL (Pasien Lama)"
-                            value={
-                              activeCat?.pl
-                                ? (formData[
-                                    activeCat.pl as keyof typeof formData
-                                  ] as string) || ""
-                                : ""
-                            }
-                            onChange={(e) =>
-                              activeCat?.pl &&
-                              handleChange(
-                                activeCat.pl as keyof typeof formData,
-                                e.target.value,
-                              )
-                            }
-                            fullWidth
-                            placeholder="Isi 1 jika pasien rujukan lama"
-                            focused
-                            size="small"
-                          />
-                        </>
-                      );
-                    })()}
-                  </Stack>
-                </Box>
-              )}
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
+                {REFERRAL_CATEGORIES.filter((cat) => cat.value !== "none").map(
+                  (cat) => (
+                    <Box
+                      key={cat.value}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: "12px",
+                        bgcolor: "#F8FAFC",
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        fontWeight={700}
+                        sx={{ mb: 1, display: "block", fontSize: "0.7rem" }}
+                      >
+                        {cat.label.toUpperCase()}
+                      </Typography>
+                      <Stack direction="row" spacing={2}>
+                        <TextField
+                          label="PB"
+                          value={
+                            (formData[
+                              cat.pb as keyof typeof formData
+                            ] as string) || ""
+                          }
+                          onChange={(e) =>
+                            handleChange(
+                              cat.pb as keyof typeof formData,
+                              e.target.value,
+                            )
+                          }
+                          fullWidth
+                          size="small"
+                          placeholder="Pasien Baru"
+                        />
+                        <TextField
+                          label="PL"
+                          value={
+                            (formData[
+                              cat.pl as keyof typeof formData
+                            ] as string) || ""
+                          }
+                          onChange={(e) =>
+                            handleChange(
+                              cat.pl as keyof typeof formData,
+                              e.target.value,
+                            )
+                          }
+                          fullWidth
+                          size="small"
+                          placeholder="Pasien Lama"
+                        />
+                      </Stack>
+                    </Box>
+                  ),
+                )}
+              </Box>
             </Box>
           </Box>
         </DialogContent>
