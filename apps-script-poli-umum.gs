@@ -156,9 +156,12 @@ function deleteBulkPatients(sheet, data) {
 
 // AUTH FUNCTIONS
 function handleLogin(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false, message: "Tab 'Users' tidak ditemukan" };
-  const values = sheet.getDataRange().getValues();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab 'USERS' tidak ditemukan" };
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "Data pengguna kosong" };
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
   const headers = values[0];
   const uCol = headers.indexOf("USERNAME"),
     pCol = headers.indexOf("PASSWORD"),
@@ -183,8 +186,9 @@ function handleLogin(data) {
 }
 
 function handleRegister(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
-  if (!sheet) return { success: false, message: "Tab 'Users' tidak ditemukan" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
+  if (!sheet) return { success: false, message: "Tab 'USERS' tidak ditemukan" };
   sheet.appendRow([
     data.username,
     data.password,
@@ -195,7 +199,8 @@ function handleRegister(data) {
 }
 
 function handleUpdateProfile(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   const values = sheet.getDataRange().getValues();
   const uCol = values[0].indexOf("USERNAME"),
     nCol = values[0].indexOf("NAMA_LENGKAP");
@@ -208,7 +213,8 @@ function handleUpdateProfile(data) {
 }
 
 function handleUpdatePassword(data) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   const values = sheet.getDataRange().getValues();
   const uCol = values[0].indexOf("USERNAME"),
     pCol = values[0].indexOf("PASSWORD");
@@ -226,9 +232,12 @@ function handleUpdatePassword(data) {
 
 // USER MANAGEMENT FUNCTIONS
 function getAllUsers() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
   const headers = data[0];
   const uCol = headers.indexOf("USERNAME");
   const pCol = headers.indexOf("PASSWORD");
