@@ -46,6 +46,7 @@ export default function PendaftaranPage() {
     USIA: "",
     JENIS_PASIEN: "BARU", // BARU/LAMA
     NIP: "",
+    KELUHAN: "",
   });
 
   const [today, setToday] = useState("");
@@ -122,6 +123,7 @@ export default function PendaftaranPage() {
         TAHUN: autoValues.TAHUN,
         BULAN: autoValues.BULAN,
         HARI: autoValues.HARI,
+        "16-15": autoValues.ENAM_BELAS_LIMA_BELAS,
         ENAM_BELAS_LIMA_BELAS: autoValues.ENAM_BELAS_LIMA_BELAS,
         L: formData.JENIS_KELAMIN === "L" ? autoValues.L : "",
         P: formData.JENIS_KELAMIN === "P" ? autoValues.P : "",
@@ -131,7 +133,7 @@ export default function PendaftaranPage() {
         USIA: formData.USIA.trim(),
         NIP: formData.NIP.trim(),
         OBS_TTV: "",
-        KELUHAN: "",
+        KELUHAN: formData.KELUHAN.trim(),
         DIAGNOSIS: "",
         ICD10: "",
         TINDAKAN: "",
@@ -156,7 +158,7 @@ export default function PendaftaranPage() {
         <Paper sx={{ p: 4, borderRadius: 4, bgcolor: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(10px)" }}>
           <LocalHospitalIcon sx={{ fontSize: 60, color: "text.secondary", mb: 2 }} />
           <Typography variant="h5" fontWeight="800" gutterBottom>Pendaftaran Tutup</Typography>
-          <Typography color="text.secondary">Pendaftaran hanya aktif pada pukul 08.00 - 16.00 WIB.</Typography>
+          <Typography color="text.secondary">Pendaftaran hanya aktif pada pukul 08.00 - 14.30 WIB.</Typography>
           <Typography sx={{ mt: 2 }} variant="body2">Silakan kembali di jam operasional. Terimakasih.</Typography>
         </Paper>
       </Container>
@@ -180,7 +182,7 @@ export default function PendaftaranPage() {
             Pendaftaran Mandiri
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-            Silakan isi data untuk mendapatkan nomor antrian
+            Lengkapi data diri Anda untuk pendaftaran pelayanan
           </Typography>
         </Box>
 
@@ -290,6 +292,17 @@ export default function PendaftaranPage() {
                     InputProps={{ sx: { borderRadius: 2.5 } }}
                   />
 
+                  <TextField
+                    fullWidth
+                    label="Keluhan Utama"
+                    placeholder="Contoh: Batuk berdahak sudah 3 hari, pusing, dsb."
+                    multiline
+                    rows={3}
+                    value={formData.KELUHAN}
+                    onChange={(e) => handleInputChange("KELUHAN", e.target.value)}
+                    InputProps={{ sx: { borderRadius: 2.5 } }}
+                  />
+
                   <Box sx={{ pt: 2 }}>
                     <Button
                       fullWidth
@@ -335,7 +348,7 @@ export default function PendaftaranPage() {
                 fullWidth 
                 onClick={() => {
                   setStep(1);
-                  setFormData({ NAMA: "", JENIS_KELAMIN: "L", USIA: "", JENIS_PASIEN: "BARU", NIP: "" });
+                  setFormData({ NAMA: "", JENIS_KELAMIN: "L", USIA: "", JENIS_PASIEN: "BARU", NIP: "", KELUHAN: "" });
                 }}
                 sx={{ borderRadius: 3, py: 1.5, fontWeight: 700 }}
               >

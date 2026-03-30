@@ -183,6 +183,7 @@ export default function PatientFormDialog({
     BULAN: "",
     HARI: "",
     ENAM_BELAS_LIMA_BELAS: "",
+    "16-15": "",
     L: "",
     P: "",
     BARU: "",
@@ -429,6 +430,7 @@ export default function PatientFormDialog({
           BULAN: "",
           HARI: "",
           ENAM_BELAS_LIMA_BELAS: "",
+          "16-15": "",
           L: "",
           P: "",
           BARU: "",
@@ -479,6 +481,9 @@ export default function PatientFormDialog({
       if (!dataToSubmit.HARI) dataToSubmit.HARI = autoValues.HARI;
       if (!dataToSubmit.ENAM_BELAS_LIMA_BELAS)
         dataToSubmit.ENAM_BELAS_LIMA_BELAS = autoValues.ENAM_BELAS_LIMA_BELAS;
+      
+      // Ensure "16-15" is also set for TS compliance
+      dataToSubmit["16-15"] = dataToSubmit.ENAM_BELAS_LIMA_BELAS;
 
       if (dataToSubmit.TANGGAL) {
         dataToSubmit.TANGGAL = formatDateForSheet(dataToSubmit.TANGGAL);

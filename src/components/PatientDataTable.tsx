@@ -34,6 +34,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import EditIcon from "@mui/icons-material/Edit";
 import HistoryIcon from "@mui/icons-material/History";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import DeleteIcon from "@mui/icons-material/Delete";
 import CheckboxIcon from "@mui/icons-material/CheckBox";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
@@ -456,13 +457,13 @@ export default function PatientDataTable({
     if (selectedIds.length === 0) return;
 
     MySwal.fire({
-      title: "Hapus Data?",
+      title: "Hapus Data Terpilih?",
       text: `Anda akan menghapus ${selectedIds.length} data pasien sekaligus. Tindakan ini tidak dapat dibatalkan!`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#FF4C51",
       cancelButtonColor: "#8592A3",
-      confirmButtonText: "Ya, Hapus Semua!",
+      confirmButtonText: "Ya, Hapus Sekaligus!",
       cancelButtonText: "Batal",
     }).then(async (result) => {
       if (result.isConfirmed) {
@@ -492,6 +493,51 @@ export default function PatientDataTable({
           Toast.fire({
             icon: "error",
             title: "Gagal menghapus data secara masal",
+          });
+        }
+      }
+    });
+  };
+
+  const handleDeletePatient = (patient: any) => {
+    const id = Number(getRowValue(patient, "id"));
+    const nama = String(getRowValue(patient, "NAMA") || "Pasien ini");
+
+    MySwal.fire({
+      title: "Hapus Data Pasien?",
+      html: `Apakah Anda yakin ingin menghapus data <b>${nama}</b>?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#FF4C51",
+      cancelButtonColor: "#8592A3",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          MySwal.fire({
+            title: "Menghapus...",
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          await deleteBulkMutation.mutateAsync([id]);
+
+          Swal.close();
+          Toast.fire({
+            icon: "success",
+            title: "Data pasien berhasil dihapus",
+          });
+
+          if (onDataChange) onDataChange();
+        } catch (error) {
+          console.error("Delete error:", error);
+          Swal.close();
+          Toast.fire({
+            icon: "error",
+            title: "Gagal menghapus data pasien",
           });
         }
       }
@@ -551,6 +597,7 @@ export default function PatientDataTable({
       ENAM_BELAS_LIMA_BELAS: String(
         p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || "",
       ),
+      "16-15": String(p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || ""),
       L: String(p.L || ""),
       P: String(p.P || ""),
       BARU: String(p.BARU || ""),
@@ -1369,6 +1416,23 @@ export default function PatientDataTable({
                                   }}
                                 >
                                   <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {canDelete && (
+                              <Tooltip title="Hapus">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeletePatient(row)}
+                                  sx={{
+                                    color: "#FF3E1D",
+                                    "&:hover": {
+                                      backgroundColor:
+                                        "rgba(255, 62, 29, 0.1)",
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                             )}
