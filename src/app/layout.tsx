@@ -23,7 +23,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props;
   return (
     <html lang="en" className={poppins.className} suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <AppRouterCacheProvider>
           <ReactQueryProvider>
             <ThemeProvider theme={theme}>{children}</ThemeProvider>

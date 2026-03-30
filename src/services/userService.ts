@@ -6,7 +6,7 @@ export interface User {
   id?: number | string; // Row ID in spreadsheet
 }
 
-const APPS_SCRIPT_URL_UMUM = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL_UMUM || "";
+const APPS_SCRIPT_URL_UMUM = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_UMUM || "";
 
 export const userService = {
   async getAllUsers(): Promise<User[]> {
