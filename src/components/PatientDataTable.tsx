@@ -597,6 +597,7 @@ export default function PatientDataTable({
       ENAM_BELAS_LIMA_BELAS: String(
         p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || "",
       ),
+      "16-15": String(p["16-15"] || p.ENAM_BELAS_LIMA_BELAS || ""),
       L: String(p.L || ""),
       P: String(p.P || ""),
       BARU: String(p.BARU || ""),
