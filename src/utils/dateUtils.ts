@@ -61,14 +61,22 @@ export const getCurrentSheetName = (): string => {
 };
 
 export const isWithinOperationalHours = (): boolean => {
-  // const now = new Date();
-  // const hours = now.getHours();
-  // // Jam 08:00 - 16:00
-  // return hours >= 8 && hours < 16;
-
-  // TEMPORARY: Always return true for manual testing
+  const now = new Date();
+  // Gunakan waktu lokal WIB (GMT+7)
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  // 08:00 - 14:30
+  // Cek jam mulai
+  if (currentHour < 8) return false;
+  
+  // Cek jam selesai
+  if (currentHour > 14) return false;
+  if (currentHour === 14 && currentMinute > 30) return false;
+  
   return true;
 };
+
 
 export const getLocalDateISO = (): string => {
   const now = new Date();
