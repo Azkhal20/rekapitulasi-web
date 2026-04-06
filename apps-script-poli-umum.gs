@@ -73,6 +73,7 @@ function handleRequest(e) {
     if (!sheet) return errorResponse("Sheet '" + sheetName + "' tidak ditemukan.");
 
     if (action === "getAll") return getAllPatients(sheet);
+    if (action === "getAllYear") return getAllYear(data.year || "2026");
     if (action === "add") return addPatient(sheet, data);
     if (action === "update") return updatePatient(sheet, data);
     if (action === "delete") return deletePatient(sheet, data);
@@ -86,26 +87,82 @@ function handleRequest(e) {
   }
 }
 
-    return getAllPatients(sheet);
-  } catch (err) {
-    return errorResponse(err.toString());
-  }
+/** 
+ * HIGH PERFORMANCE: Get ALL months data in ONE request 
+ */
+/** 
+ * HIGH PERFORMANCE: Get ALL months data in ONE request 
+ */
+function getAllYear(year) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const months = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+  const result = {};
+
+  months.forEach(month => {
+    const sheetNameWithYear = month + " " + year;
+    let sheet = ss.getSheetByName(sheetNameWithYear);
+    
+    // Fallback: Try search by month name only if with year fails
+    if (!sheet) {
+      sheet = ss.getSheetByName(month);
+    }
+
+    if (sheet) {
+      result[sheetNameWithYear] = getAllPatientsRaw(sheet);
+    } else {
+      result[sheetNameWithYear] = [];
+    }
+  });
+
+  return successResponse(result);
 }
 
-// PATIENT CRUD
-function getAllPatients(sheet) {
+/** Helper extracted from getAllPatients to avoid code duplication with Dynamic Column Mapping */
+function getAllPatientsRaw(sheet) {
   const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return successResponse([]);
-  const dataRange = sheet.getRange(3, 1, lastRow - 2, 28);
-  const displayValues = dataRange.getDisplayValues();
-  const result = displayValues.map((row, i) => {
-    let obj = { id: i + 3 };
-    COLUMN_MAPPING.forEach((key, index) => {
-      obj[key] = row[index] || "";
-    });
-    return obj;
+  if (lastRow < 2) return [];
+
+  const fullData = sheet.getRange(1, 1, Math.min(lastRow, 10), sheet.getLastColumn()).getValues();
+
+  const dataStart = 2; // DEFAULT: Skip Row 1 & 2, start from Row 3
+  const numRows = lastRow - dataStart;
+  if (numRows <= 0) return [];
+
+  const displayValues = sheet.getRange(dataStart + 1, 1, numRows, sheet.getLastColumn()).getDisplayValues();
+
+  // Find headers for mapping (search in Row 1 or 2)
+  const headerSearchRange = sheet.getRange(1, 1, 2, sheet.getLastColumn()).getValues();
+  let headers = headerSearchRange[1].map(h => String(h).toUpperCase().trim()); // Default to Row 2
+  
+  // If "TANGGAL" is actually on Row 1, use that as header row but still start data at Row 3
+  if (!headers.includes("TANGGAL") && headerSearchRange[0].map(h => String(h).toUpperCase()).includes("TANGGAL")) {
+    headers = headerSearchRange[0].map(h => String(h).toUpperCase().trim());
+  }
+
+  // Create column mapping dynamically
+  const colIndex = {};
+  COLUMN_MAPPING.forEach(key => {
+    // Search for matching header
+    const idx = headers.findIndex(h => h === key || h === key.replace("_", " ") || h.includes(key));
+    colIndex[key] = idx;
   });
-  return successResponse(result);
+
+  const results = [];
+  for (let i = 0; i < displayValues.length; i++) {
+    const row = displayValues[i];
+    // Check if row has data (must have something in the detected TANGGAL or NAMA column)
+    let obj = { id: dataStart + 1 + i };
+    COLUMN_MAPPING.forEach((key) => {
+      const idx = colIndex[key];
+      obj[key] = (idx !== -1 && idx !== undefined) ? row[idx] : "";
+    });
+    results.push(obj);
+  }
+  return results;
+}
+
+function getAllPatients(sheet) {
+  return successResponse(getAllPatientsRaw(sheet));
 }
 
 function addPatient(sheet, data) {
@@ -230,12 +287,12 @@ function getAllUsers() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   const data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
-  const headers = data[0].map(h => String(h).toUpperCase().replace(/\W/g, "").trim());
+  const headers = data[0].map(h => String(h).toUpperCase().trim());
   
-  const uCol = headers.findIndex(h => h === "USERNAME"),
+  const uCol = headers.findIndex(h => h === "USERNAME" || h === "ID"),
         pCol = headers.findIndex(h => h === "PASSWORD"),
         rCol = headers.findIndex(h => h === "ROLE"),
-        nCol = headers.findIndex(h => h === "NAMALENGKAP");
+        nCol = headers.findIndex(h => h === "NAMA_LENGKAP" || h === "NAMALENGKAP" || h === "NAMA" || h.includes("NAMA"));
 
   const users = [];
   for (let i = 1; i < data.length; i++) {
@@ -256,12 +313,12 @@ function saveUser(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName("USERS") || ss.getSheetByName("Users");
   if (!sheet) return { success: false, message: "Tab USERS missing" };
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toUpperCase().replace(/\W/g, "").trim());
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toUpperCase().trim());
 
-  const uIdx = headers.findIndex(h => h === "USERNAME"),
+  const uIdx = headers.findIndex(h => h === "USERNAME" || h === "ID"),
         pIdx = headers.findIndex(h => h === "PASSWORD"),
         rIdx = headers.findIndex(h => h === "ROLE"),
-        nIdx = headers.findIndex(h => h === "NAMALENGKAP");
+        nIdx = headers.findIndex(h => h === "NAMA_LENGKAP" || h === "NAMALENGKAP" || h === "NAMA" || h.includes("NAMA"));
 
   if (data.id) {
     const row = parseInt(data.id);

@@ -105,9 +105,13 @@ export interface ReferralExportData {
 
 interface ReferralSummaryProps {
   onDataReady?: (data: ReferralExportData) => void;
+  externalData?: {
+    umum: Record<string, PatientData[]>;
+    gigi: Record<string, PatientData[]>;
+  };
 }
 
-export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
+export default function ReferralSummary({ onDataReady, externalData }: ReferralSummaryProps) {
   const [loading, setLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(
     new Date().getFullYear().toString(),
@@ -155,8 +159,23 @@ export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
   }, [selectedYear]);
 
   useEffect(() => {
+    // If we have external data, use it and skip internal fetch
+    if (externalData && (Object.keys(externalData.umum).length > 0 || Object.keys(externalData.gigi).length > 0)) {
+      const results: Record<string, { umum: PatientData[]; gigi: PatientData[] }> = {};
+      MONTHS.forEach(month => {
+        const key = `${month} ${selectedYear}`;
+        results[month] = {
+          umum: externalData.umum[key] || [],
+          gigi: externalData.gigi[key] || []
+        };
+      });
+      setData(results);
+      setLoading(false);
+      return;
+    }
+
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, externalData, selectedYear]);
 
   const isFilled = (val: unknown) => {
     if (!val) return false;

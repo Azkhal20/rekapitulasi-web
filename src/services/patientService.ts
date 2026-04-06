@@ -35,13 +35,23 @@ export interface PatientData {
 export type PoliType = 'umum' | 'gigi';
 
 class PatientService {
+  // Simple cache to prevent redundant fetches
+  private cache: Map<string, { data: PatientData[], timestamp: number }> = new Map();
+  private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Request bottleneck to prevent GAS concurrency limits
+  private activeRequests: Map<string, Promise<any>> = new Map();
   
   private getBaseUrl(poli: PoliType = 'umum'): string {
     const url = poli === 'gigi' 
       ? process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_GIGI 
-      : process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_UMUM; // Fallback / Default
+      : process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL_UMUM;
       
-    return url || '';
+    if (!url) {
+      console.error(`[API ERROR] URL untuk poli ${poli} tidak ditemukan di .env.local!`);
+      return '';
+    }
+    return url;
   }
 
   private checkUrl(baseUrl: string) {
@@ -70,23 +80,113 @@ class PatientService {
     }
   }
 
-  // AMBIL SEMUA DATA
-  async getAllPatients(sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData[]> {
-    try {
-      const baseUrl = this.getBaseUrl(poli);
-      this.checkUrl(baseUrl);
-      
-      const url = `${baseUrl}?action=getAll&sheetName=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-      });
+  // INSTANCE QUEUE: Individual queue per poli/deployment to allow parallel loading of Umum vs Gigi
+  private requestQueue: Promise<any> = Promise.resolve();
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      return await this.parseResponse(response, 'getAll');
-    } catch (error) {
-      console.error(`Error fetching patients (Sheet: ${sheetName}, Poli: ${poli}):`, error);
-      throw error;
+  // AMBIL SEMUA DATA (Optimized with Cache, Retry, & Sequential Per-Poli Queue)
+  async getAllPatients(sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData[]> {
+    const cacheKey = `${poli}-${sheetName}`;
+    
+    // 1. Check Cache first (Instant, no queueing needed)
+    const cached = this.cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
+      return cached.data;
+    }
+
+    // 2. Check if there's an ongoing request for this specific month/poli
+    const ongoing = this.activeRequests.get(cacheKey);
+    if (ongoing) return ongoing;
+
+    // 3. Queue the request in the Instance Queue (Umum and Gigi load in parallel)
+    const fetchPromise = (async () => {
+      // Use the instance queue to wrap our fetch logic
+      return this.requestQueue = this.requestQueue.then(async () => {
+        // Re-check cache inside queue (maybe it was filled while waiting)
+        const reCached = this.cache.get(cacheKey);
+        if (reCached && (Date.now() - reCached.timestamp < this.CACHE_TTL)) return reCached.data;
+
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+        
+        while (attempts < MAX_ATTEMPTS) {
+          try {
+            const baseUrl = this.getBaseUrl(poli);
+            this.checkUrl(baseUrl);
+            
+            // REMOVED 't' parameter to avoid bypassing Google caching and spam detection
+            const url = `${baseUrl}?action=getAll&sheetName=${encodeURIComponent(sheetName)}`;
+            
+            const response = await fetch(url, { 
+              method: 'GET',
+              mode: 'cors',
+              credentials: 'omit',
+              redirect: 'follow'
+            });
+
+            if (!response.ok) {
+              if (response.status === 429) { // Rate limit
+                await new Promise(r => setTimeout(r, 2000 * (attempts + 1)));
+                attempts++;
+                continue;
+              }
+              throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await this.parseResponse(response, 'getAll');
+            
+            // Save to cache
+            this.cache.set(cacheKey, { data, timestamp: Date.now() });
+            
+            // JEDA WAJIB: Wait before releasing the global queue to the next request
+            await new Promise(r => setTimeout(r, 300));
+            
+            return data;
+          } catch (error) {
+            attempts++;
+            if (attempts >= MAX_ATTEMPTS) {
+              console.error(`[API] Final failure for ${sheetName}:`, error);
+              return [];
+            }
+            // Exponential backoff
+            await new Promise(r => setTimeout(r, 1000 * attempts));
+          }
+        }
+        return [];
+      });
+    })();
+
+    // Store in active requests for month deduplication
+    this.activeRequests.set(cacheKey, fetchPromise);
+    
+    try {
+      return await fetchPromise;
+    } finally {
+      this.activeRequests.delete(cacheKey);
+    }
+  }
+
+  // AMBIL DATA SETAHUN SEKALIGUS (High Performance)
+  async getAllYearPatients(year: string = "2026", poli: PoliType = 'umum'): Promise<Record<string, PatientData[]>> {
+    const baseUrl = this.getBaseUrl(poli);
+    this.checkUrl(baseUrl);
+    const url = `${baseUrl}?action=getAllYear&year=${encodeURIComponent(year)}`;
+
+    try {
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        // Pre-fill individual month caches to speed up other components
+        Object.entries(result.data as Record<string, PatientData[]>).forEach(([sheetName, data]) => {
+          this.cache.set(`${poli}-${sheetName}`, { data, timestamp: Date.now() });
+        });
+        return result.data;
+      }
+      return {};
+    } catch (e) {
+      console.error(`Gagal memuat rekap tahunan (${poli}):`, e);
+      return {};
     }
   }
 
