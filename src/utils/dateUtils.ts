@@ -62,7 +62,7 @@ export const getCurrentSheetName = (): string => {
 
 export const isWithinOperationalHours = (): boolean => {
   const now = new Date();
-  // Gunakan waktu lokal WIB (GMT+7)
+  // Menggunakan waktu lokal WIB (GMT+7)
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   
