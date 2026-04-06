@@ -13,7 +13,16 @@ export const userService = {
     try {
       const response = await fetch(`${APPS_SCRIPT_URL_UMUM}?action=getUsers`);
       if (!response.ok) throw new Error("Gagal mengambil data user");
-      return await response.json();
+      const data = await response.json();
+      
+      // Map GAS fields to frontend User interface (handling potential uppercase keys)
+      return data.map((u: Record<string, any>) => ({
+        username: u.username || u.USERNAME || "",
+        fullName: u.fullName || u.NAMA_LENGKAP || u.FULLNAME || "",
+        role: u.role || u.ROLE || "admin",
+        password: u.password || u.PASSWORD || "",
+        id: u.id || u.ID || "",
+      }));
     } catch (error) {
       console.error("Error fetching users:", error);
       return [];
