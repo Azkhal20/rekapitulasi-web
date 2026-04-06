@@ -10,7 +10,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check authentication on mount and route change
-    const IDLE_TIMEOUT = 10 * 60 * 1000; // 10 minutes of inactivity
+    const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes of inactivity
     let idleTimer: NodeJS.Timeout;
 
     const resetIdleTimer = () => {
