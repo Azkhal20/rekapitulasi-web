@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Card,
@@ -102,13 +102,6 @@ export default function DashboardPage() {
   });
   const [periodicRekap, setPeriodicRekap] = useState<PeriodicData[]>([]);
   const [loadingPeriodic, setLoadingPeriodic] = useState(false);
-  const [rawDataUmum, setRawDataUmum] = useState<Record<string, PatientData[]>>({});
-  const [rawDataGigi, setRawDataGigi] = useState<Record<string, PatientData[]>>({});
-
-  const externalData = useMemo(() => ({
-    umum: rawDataUmum,
-    gigi: rawDataGigi
-  }), [rawDataUmum, rawDataGigi]);
 
 
   const fetchPeriodicRekap = useCallback(async () => {
@@ -198,7 +191,7 @@ export default function DashboardPage() {
       setLoading(false);
       setLoadingPeriodic(false);
     }
-  }, [tableYear, periodName, selectedPoli]);
+  }, [tableYear]);
 
 
   useEffect(() => {
@@ -300,9 +293,7 @@ export default function DashboardPage() {
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
-      // Derive data from bulk map if available, otherwise fetch specifically (fallback)
-      const cached = (selectedPoli === "gigi" ? rawDataGigi[periodName] : rawDataUmum[periodName]);
-      const data = cached || await patientService.getAllPatients(periodName, selectedPoli);
+      const data = await patientService.getAllPatients(periodName, selectedPoli);
 
       const total = data.length;
       const now = new Date();
@@ -332,14 +323,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedPoli, periodName, rawDataUmum, rawDataGigi]);
+  }, [selectedPoli, periodName]);
 
 
   const fetchCombinedStats = useCallback(async () => {
     try {
-      // Derive data from bulk maps if possible
-      const dataUmum = rawDataUmum[periodName] || await patientService.getAllPatients(periodName, "umum");
-      const dataGigi = rawDataGigi[periodName] || await patientService.getAllPatients(periodName, "gigi");
+      const dataUmum = await patientService.getAllPatients(periodName, "umum");
+      const dataGigi = await patientService.getAllPatients(periodName, "gigi");
 
       const calculateTotals = (data: PatientData[]) => {
         let L = 0, P = 0, baru = 0, lama = 0;
@@ -364,9 +354,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to fetch combined stats:", error);
     }
-  }, [periodName, rawDataUmum, rawDataGigi]);
-
-
+  }, [periodName]);
   useEffect(() => {
     if (isStorageLoaded) {
       fetchStats();
@@ -1221,7 +1209,7 @@ export default function DashboardPage() {
       </Paper>
 
       {/* Rekap Rujukan Component - Restored with Export Integration */}
-      <ReferralSummary onDataReady={handleReferralDataReady} externalData={externalData} />
+      <ReferralSummary onDataReady={handleReferralDataReady} />
     </Box>
   );
 }
