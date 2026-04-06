@@ -127,20 +127,24 @@ export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
         { umum: PatientData[]; gigi: PatientData[] }
       > = {};
 
-      // Fetch for each month
-      const promises = MONTHS.map(async (month) => {
+      // Fetch for each month - SEQUENTIAL FETCH to avoid overwhelming GAS backend
+      // Using a for-of loop instead of Promise.all(map) ensures we don't hit GAS rate limits (24 parallel requests)
+      for (const month of MONTHS) {
         const sheetName = `${month} ${selectedYear}`;
-        const [umum, gigi] = await Promise.all([
-          patientService.getAllPatients(sheetName, "umum").catch(() => []),
-          patientService.getAllPatients(sheetName, "gigi").catch(() => []),
-        ]);
-        return { month, umum, gigi };
-      });
-
-      const monthResults = await Promise.all(promises);
-      monthResults.forEach((res) => {
-        results[res.month] = { umum: res.umum, gigi: res.gigi };
-      });
+        
+        try {
+          // We can still parallelize within a single month (umum + gigi = 2 requests)
+          const [umum, gigi] = await Promise.all([
+            patientService.getAllPatients(sheetName, "umum").catch(() => []),
+            patientService.getAllPatients(sheetName, "gigi").catch(() => []),
+          ]);
+          
+          results[month] = { umum, gigi };
+        } catch (monthError) {
+          console.error(`Error fetching data for ${month}:`, monthError);
+          results[month] = { umum: [], gigi: [] };
+        }
+      }
 
       setData(results);
     } catch (error) {

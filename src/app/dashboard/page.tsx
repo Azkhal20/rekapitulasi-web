@@ -171,12 +171,19 @@ export default function DashboardPage() {
       );
 
       const fetchAll = async (poli: PoliType) => {
-        const promises = allMonths.map((m) =>
-          patientService.getAllPatients(m, poli).catch(() => []),
-        );
-        const results = await Promise.all(promises);
         const map: Record<string, PatientData[]> = {};
-        allMonths.forEach((m, i) => (map[m] = results[i]));
+        
+        // SEQUENTIAL FETCH: Don't overwhelm Google Apps Script with 13 parallel requests
+        for (const m of allMonths) {
+          try {
+            const result = await patientService.getAllPatients(m, poli).catch(() => []);
+            map[m] = result;
+          } catch (e) {
+            console.error(`Gagal memuat bulan ${m} (${poli}):`, e);
+            map[m] = [];
+          }
+        }
+        
         return map;
       };
 
