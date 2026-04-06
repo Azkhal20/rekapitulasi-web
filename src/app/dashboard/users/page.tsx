@@ -97,7 +97,9 @@ export default function UserManagementPage() {
     }
   };
 
-  const getRoleColor = (role: string) => {
+  type ChipColor = "error" | "primary" | "success" | "default";
+
+  const getRoleColor = (role: string): ChipColor => {
     switch (role) {
       case "super_admin":
         return "error";
@@ -196,7 +198,7 @@ export default function UserManagementPage() {
                     <Chip
                       label={user.role.toUpperCase()}
                       size="small"
-                      color={getRoleColor(user.role) as any}
+                      color={getRoleColor(user.role)}
                       sx={{ fontWeight: 600, fontSize: "0.7rem" }}
                     />
                   </TableCell>
