@@ -1,6 +1,6 @@
 // Auth utilities for session management
 export const AUTH_STORAGE_KEY = 'user';
-export const SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+export const SESSION_DURATION = 1 * 60 * 60 * 1000; // REDUCED TO 1 HOUR for better security
 
 export interface UserData {
   username: string;

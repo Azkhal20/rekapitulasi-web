@@ -10,25 +10,58 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check authentication on mount and route change
+    const IDLE_TIMEOUT = 10 * 60 * 1000; // 10 minutes of inactivity
+    let idleTimer: NodeJS.Timeout;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (isAuthenticated() && pathname.startsWith("/dashboard")) {
+          // Force logout for security
+          import("@/lib/auth").then(({ clearUserSession }) => {
+            clearUserSession();
+            router.replace("/");
+          });
+        }
+      }, IDLE_TIMEOUT);
+    };
+
     const checkAuth = () => {
       const authenticated = isAuthenticated();
 
-      // If not authenticated and trying to access protected route
-      if (!authenticated && pathname !== "/") {
-        router.replace("/");
+      // If not authenticated and trying to access dashboard routes, boot them out
+      if (!authenticated) {
+        if (pathname !== "/" && pathname.startsWith("/dashboard")) {
+          router.replace("/");
+        }
+      } else {
+        // Only start idle timer if authenticated
+        resetIdleTimer();
       }
     };
 
     checkAuth();
 
-    // Set up interval to check session expiration every minute
+    // Listeners for activity
+    const activityEvents = ["mousemove", "keydown", "scroll", "click", "touchstart"];
+    activityEvents.forEach((event) => {
+      window.addEventListener(event, resetIdleTimer);
+    });
+
+    // Set up rapid check for session validity every 30 seconds
     const interval = setInterval(() => {
-      if (!isAuthenticated() && pathname !== "/") {
+      if (!isAuthenticated() && pathname.startsWith("/dashboard")) {
         router.replace("/");
       }
-    }, 60000); // Check every minute
+    }, 30000); 
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(idleTimer);
+      activityEvents.forEach((event) => {
+        window.removeEventListener(event, resetIdleTimer);
+      });
+    };
   }, [pathname, router]);
 
   return <>{children}</>;
