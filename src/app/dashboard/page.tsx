@@ -45,6 +45,10 @@ interface PeriodicData {
   total: number;
   umum: number;
   gigi: number;
+  umumBaru: number;
+  umumLama: number;
+  gigiBaru: number;
+  gigiLama: number;
 }
 
 export default function DashboardPage() {
@@ -96,6 +100,9 @@ export default function DashboardPage() {
   const [tableYear, setTableYear] = useState<string>(() => {
     return new Date().getFullYear().toString();
   });
+  
+  // LOGIK REKAP TAHUNAN JENIS PASIEN
+  const [annualTypePoli, setAnnualTypePoli] = useState<"umum" | "gigi" | "gabungan">("gabungan");
   const [periodicRekap, setPeriodicRekap] = useState<PeriodicData[]>([]);
   const [loadingPeriodic, setLoadingPeriodic] = useState(false);
 
@@ -186,6 +193,13 @@ export default function DashboardPage() {
           let countL = 0;
           let countP = 0;
 
+          // Define inclusive end date for this period once
+          const periodEndDateInclusive = new Date(
+            period.endDate.getFullYear(),
+            period.endDate.getMonth(),
+            period.endDate.getDate() + 1,
+          );
+
           data.forEach((p) => {
             if (!p.TANGGAL) return;
             // Validasi baris data: Hindari baris header/subheader
@@ -193,12 +207,6 @@ export default function DashboardPage() {
             if (tglStr === "tanggal" || tglStr === "tgl") return;
 
             const pDate = parseRowDate(String(p.TANGGAL));
-            // Fix off-by-1 error: endDate should include the entire day
-            const periodEndDateInclusive = new Date(
-              period.endDate.getFullYear(),
-              period.endDate.getMonth(),
-              period.endDate.getDate() + 1,
-            );
 
             if (
               !isNaN(pDate.getTime()) &&
@@ -225,11 +233,23 @@ export default function DashboardPage() {
                 countP++;
             }
           });
-          return { L: countL, P: countP, total: countL + countP };
+          return { 
+            L: countL, 
+            P: countP, 
+            total: countL + countP,
+            baru: data.filter(p => {
+              const pDate = parseRowDate(String(p.TANGGAL));
+              return !isNaN(pDate.getTime()) && pDate >= period.startDate && pDate < periodEndDateInclusive && isFilled(p.BARU);
+            }).length,
+            lama: data.filter(p => {
+              const pDate = parseRowDate(String(p.TANGGAL));
+              return !isNaN(pDate.getTime()) && pDate >= period.startDate && pDate < periodEndDateInclusive && isFilled(p.LAMA);
+            }).length
+          };
         };
 
-        const periodUmum = { L: 0, P: 0, total: 0 };
-        const periodGigi = { L: 0, P: 0, total: 0 };
+        const periodUmum = { L: 0, P: 0, total: 0, baru: 0, lama: 0 };
+        const periodGigi = { L: 0, P: 0, total: 0, baru: 0, lama: 0 };
 
         period.monthsInvolved.forEach((m) => {
           const u = calculateTotals(umumMap[m] || []);
@@ -239,9 +259,14 @@ export default function DashboardPage() {
           periodUmum.P += u.P;
           periodUmum.total += u.total;
 
+          periodUmum.baru += u.baru;
+          periodUmum.lama += u.lama;
+
           periodGigi.L += g.L;
           periodGigi.P += g.P;
           periodGigi.total += g.total;
+          periodGigi.baru += g.baru;
+          periodGigi.lama += g.lama;
         });
 
         return {
@@ -249,6 +274,10 @@ export default function DashboardPage() {
           total: periodUmum.total + periodGigi.total,
           umum: periodUmum.total,
           gigi: periodGigi.total,
+          umumBaru: periodUmum.baru,
+          umumLama: periodUmum.lama,
+          gigiBaru: periodGigi.baru,
+          gigiLama: periodGigi.lama,
         };
       });
 
@@ -1193,6 +1222,135 @@ export default function DashboardPage() {
                 </TableRow>
               </TableFooter>
             )}
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Full Width Table Section: Rekap Tahunan Jenis Pasien */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 5,
+          p: 3,
+          borderRadius: "24px",
+          border: "1px solid #F1F5F9",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={3}
+          flexWrap="wrap"
+          gap={2}
+        >
+          <Box display="flex" alignItems="center" gap={2}>
+            <AssignmentIcon sx={{ color: "primary.main", fontSize: 32 }} />
+            <Box>
+              <Typography variant="h5" fontWeight="800" color="#1E293B">
+                Rekap Jenis Pasien Tahunan {tableYear}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Total Pasien Baru dan Lama Berdasarkan Poli yang Dipilih
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box display="flex" gap={2}>
+            <FormControl sx={{ minWidth: 140 }}>
+              <InputLabel id="annual-poli-label">Pilih Poli</InputLabel>
+              <Select
+                labelId="annual-poli-label"
+                value={annualTypePoli}
+                label="Pilih Poli"
+                size="small"
+                onChange={(e) => setAnnualTypePoli(e.target.value as "umum" | "gigi" | "gabungan")}
+                sx={{ borderRadius: "12px", bgcolor: "white" }}
+              >
+                <MenuItem value="umum">Poli Umum</MenuItem>
+                <MenuItem value="gigi">Poli Gigi</MenuItem>
+                <MenuItem value="gabungan">Gabungan</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+              <TableRow>
+                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", fontSize: "0.90rem" }}>
+                  KATEGORI JENIS PASIEN
+                </TableCell>
+                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", fontSize: "0.90rem" }}>
+                  TOTAL KUNJUNGAN TAHUNAN
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loadingPeriodic ? (
+                <TableRow>
+                  <TableCell colSpan={2} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={32} />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <>
+                  <TableRow hover>
+                    <TableCell align="center">
+                      <Box display="flex" alignItems="center" justifyContent="center" gap={1.5}>
+                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#10B981" }} />
+                        <Typography variant="body2" fontWeight="700" color="#334155">TOTAL PASIEN BARU</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="h6" fontWeight="800" color="#10B981">
+                        {periodicRekap.reduce((acc, period) => {
+                          if (annualTypePoli === "umum") return acc + (period.umumBaru || 0);
+                          if (annualTypePoli === "gigi") return acc + (period.gigiBaru || 0);
+                          return acc + (period.umumBaru || 0) + (period.gigiBaru || 0);
+                        }, 0).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow hover>
+                    <TableCell align="center">
+                      <Box display="flex" alignItems="center" justifyContent="center" gap={1.5}>
+                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#F59E0B" }} />
+                        <Typography variant="body2" fontWeight="700" color="#334155">TOTAL PASIEN LAMA</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="h6" fontWeight="800" color="#F59E0B">
+                        {periodicRekap.reduce((acc, period) => {
+                          if (annualTypePoli === "umum") return acc + (period.umumLama || 0);
+                          if (annualTypePoli === "gigi") return acc + (period.gigiLama || 0);
+                          return acc + (period.umumLama || 0) + (period.gigiLama || 0);
+                        }, 0).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+                    <TableCell align="center" sx={{ fontWeight: 900, color: "#1E293B", fontSize: "0.95rem" }}>
+                      GRAND TOTAL TAHUNAN
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="h5" fontWeight="900" color="primary.main">
+                        {periodicRekap.reduce((acc, period) => {
+                          if (annualTypePoli === "umum") return acc + (period.umum || 0);
+                          if (annualTypePoli === "gigi") return acc + (period.gigi || 0);
+                          return acc + (period.total || 0);
+                        }, 0).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                </>
+              )}
+            </TableBody>
           </Table>
         </TableContainer>
       </Paper>
