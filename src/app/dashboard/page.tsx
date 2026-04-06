@@ -535,13 +535,16 @@ export default function DashboardPage() {
     });
   };
 
-  // Callback untuk menerima data diagnosis dari TopDiagnosisChart
   const handleDiagnosisDataReady = useCallback(
     (data: Array<{ name: string; count: number }>) => {
       setTopDiagnosisData(data);
     },
     [],
   );
+
+  const handleReferralDataReady = useCallback((data: ReferralExportData) => {
+    setTopReferralData(data);
+  }, []);
 
   const stats = [
     {
@@ -1357,7 +1360,7 @@ export default function DashboardPage() {
       </Paper>
 
       {/* Rekap Rujukan Component - Restored with Export Integration */}
-      <ReferralSummary onDataReady={(data) => setTopReferralData(data)} />
+      <ReferralSummary onDataReady={handleReferralDataReady} />
     </Box>
   );
 }
