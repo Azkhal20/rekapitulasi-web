@@ -37,6 +37,7 @@ import {
   PoliType,
   PatientData,
 } from "@/services/patientService";
+import ReferralSummary, { ReferralExportData } from "@/components/Dashboard/ReferralSummary";
 import { exportDashboardToExcel } from "@/utils/exportDashboardToExcel";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -45,10 +46,6 @@ interface PeriodicData {
   total: number;
   umum: number;
   gigi: number;
-  umumBaru: number;
-  umumLama: number;
-  gigiBaru: number;
-  gigiLama: number;
 }
 
 export default function DashboardPage() {
@@ -88,6 +85,9 @@ export default function DashboardPage() {
   const [topDiagnosisData, setTopDiagnosisData] = useState<
     Array<{ name: string; count: number }>
   >([]);
+  const [topReferralData, setTopReferralData] = useState<ReferralExportData | null>(
+    null,
+  );
   const { isSuperAdmin, isAdmin } = usePermissions();
 
   useEffect(() => {
@@ -100,9 +100,6 @@ export default function DashboardPage() {
   const [tableYear, setTableYear] = useState<string>(() => {
     return new Date().getFullYear().toString();
   });
-  
-  // LOGIK REKAP TAHUNAN JENIS PASIEN
-  const [annualTypePoli, setAnnualTypePoli] = useState<"umum" | "gigi" | "gabungan">("gabungan");
   const [periodicRekap, setPeriodicRekap] = useState<PeriodicData[]>([]);
   const [loadingPeriodic, setLoadingPeriodic] = useState(false);
 
@@ -233,23 +230,11 @@ export default function DashboardPage() {
                 countP++;
             }
           });
-          return { 
-            L: countL, 
-            P: countP, 
-            total: countL + countP,
-            baru: data.filter(p => {
-              const pDate = parseRowDate(String(p.TANGGAL));
-              return !isNaN(pDate.getTime()) && pDate >= period.startDate && pDate < periodEndDateInclusive && isFilled(p.BARU);
-            }).length,
-            lama: data.filter(p => {
-              const pDate = parseRowDate(String(p.TANGGAL));
-              return !isNaN(pDate.getTime()) && pDate >= period.startDate && pDate < periodEndDateInclusive && isFilled(p.LAMA);
-            }).length
-          };
+          return { L: countL, P: countP, total: countL + countP };
         };
 
-        const periodUmum = { L: 0, P: 0, total: 0, baru: 0, lama: 0 };
-        const periodGigi = { L: 0, P: 0, total: 0, baru: 0, lama: 0 };
+        const periodUmum = { L: 0, P: 0, total: 0 };
+        const periodGigi = { L: 0, P: 0, total: 0 };
 
         period.monthsInvolved.forEach((m) => {
           const u = calculateTotals(umumMap[m] || []);
@@ -259,14 +244,9 @@ export default function DashboardPage() {
           periodUmum.P += u.P;
           periodUmum.total += u.total;
 
-          periodUmum.baru += u.baru;
-          periodUmum.lama += u.lama;
-
           periodGigi.L += g.L;
           periodGigi.P += g.P;
           periodGigi.total += g.total;
-          periodGigi.baru += g.baru;
-          periodGigi.lama += g.lama;
         });
 
         return {
@@ -274,10 +254,6 @@ export default function DashboardPage() {
           total: periodUmum.total + periodGigi.total,
           umum: periodUmum.total,
           gigi: periodGigi.total,
-          umumBaru: periodUmum.baru,
-          umumLama: periodUmum.lama,
-          gigiBaru: periodGigi.baru,
-          gigiLama: periodGigi.lama,
         };
       });
 
@@ -555,6 +531,7 @@ export default function DashboardPage() {
       topDiagnosis: topDiagnosisData,
       periodicRekap: periodicRekap,
       selectedPoli: selectedPoli,
+      referralData: topReferralData,
     });
   };
 
@@ -897,7 +874,7 @@ export default function DashboardPage() {
         </Paper>
       </Box>
 
-      {/* Ringkasan Gabungan (Umum & Gigi) - Unified Summary Table */}
+      {/* Ringkasan Gabungan (Umum & Gigi) - Reverted to Original Card Style */}
       <Paper
         elevation={0}
         sx={{
@@ -910,98 +887,251 @@ export default function DashboardPage() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
         }}
       >
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={3}
+        <Typography
+          variant="h6"
+          fontWeight="800"
+          sx={{ mb: 2.5, color: "#1E293B", letterSpacing: "-0.01em" }}
         >
-          <Box display="flex" alignItems="center" gap={2}>
-            <WcIcon sx={{ color: "primary.main", fontSize: 28 }} />
-            <Box>
-              <Typography
-                variant="h5"
-                fontWeight="800"
-                sx={{ color: "#1E293B", letterSpacing: "-0.01em" }}
-              >
-                Ringkasan Gabungan (Umum & Gigi)
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Data Akumulasi Jenis Pasien: {periodName}
-              </Typography>
+          Ringkasan Gabungan (Umum & Gigi)
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: 3,
+          }}
+        >
+          {/* Card: Total Akumulasi Gabungan */}
+          <Card
+            sx={{
+              borderRadius: "24px",
+              background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+              color: "white",
+              boxShadow: "0 10px 25px rgba(79, 70, 229, 0.2)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <Box
+              sx={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                opacity: 0.2,
+              }}
+            >
+              <PeopleIcon sx={{ fontSize: 160 }} />
             </Box>
-          </Box>
+            <CardContent sx={{ p: 3.5 }}>
+              <Typography
+                variant="overline"
+                sx={{ opacity: 0.8, letterSpacing: 2, fontWeight: 700 }}
+              >
+                Total Akumulasi Pasien
+              </Typography>
+              <Typography variant="h2" fontWeight="900" sx={{ mt: 1, mb: 2 }}>
+                {loading ? "..." : combinedStats.totalBothPoli.toLocaleString()}
+              </Typography>
+              <Box display="flex" gap={2}>
+                <Box
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    px: 2,
+                    py: 1,
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="white">
+                    L: {combinedStats.totalL}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    px: 2,
+                    py: 1,
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <Typography variant="body2" fontWeight="700" color="white">
+                    P: {combinedStats.totalP}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Card: Tipe Pasien (Baru & Lama) - Original List Style */}
+          <Card
+            sx={{
+              borderRadius: "24px",
+              border: "1px solid #E2E8F0",
+              bgcolor: "white",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
+            }}
+          >
+            <CardContent sx={{ p: 3.5 }}>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+              >
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="800"
+                  color="#1E293B"
+                >
+                  Tipe Pasien: {periodName}
+                </Typography>
+                <Box
+                  sx={{
+                    background:
+                      "linear-gradient(90deg, #F59E0B 0%, #D97706 100%)",
+                    color: "white",
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: "20px",
+                    fontSize: "0.75rem",
+                    fontWeight: 800,
+                    boxShadow: "0 2px 6px rgba(245, 158, 11, 0.3)",
+                  }}
+                >
+                  {loading
+                    ? "..."
+                    : (combinedStats.totalBaru || 0) +
+                      (combinedStats.totalLama || 0)}{" "}
+                  TOTAL
+                </Box>
+              </Box>
+
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {/* Poli Umum */}
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "#4F46E5",
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight="700"
+                      color="#475569"
+                    >
+                      Poli Umum
+                    </Typography>
+                  </Box>
+                  <Box textAlign="right">
+                    <Typography
+                      variant="body2"
+                      fontWeight="800"
+                      color="#1E293B"
+                    >
+                      {loading
+                        ? "..."
+                        : (combinedStats.periodTotals.umum.baru || 0) +
+                          (combinedStats.periodTotals.umum.lama || 0)}{" "}
+                      Pasien
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      fontWeight="600"
+                    >
+                      Baru: {combinedStats.periodTotals.umum.baru} | Lama:{" "}
+                      {combinedStats.periodTotals.umum.lama}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Divider sx={{ borderStyle: "dashed" }} />
+
+                {/* Poli Gigi */}
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "#DB2777",
+                      }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight="700"
+                      color="#475569"
+                    >
+                      Poli Gigi
+                    </Typography>
+                  </Box>
+                  <Box textAlign="right">
+                    <Typography
+                      variant="body2"
+                      fontWeight="800"
+                      color="#1E293B"
+                    >
+                      {loading
+                        ? "..."
+                        : (combinedStats.periodTotals.gigi.baru || 0) +
+                          (combinedStats.periodTotals.gigi.lama || 0)}{" "}
+                      Pasien
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      fontWeight="600"
+                    >
+                      Baru: {combinedStats.periodTotals.gigi.baru} | Lama:{" "}
+                      {combinedStats.periodTotals.gigi.lama}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              <Box sx={{ height: "1px", bgcolor: "#F1F5F9", my: 2.5 }} />
+
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontWeight="600"
+                >
+                  Total Periode Ini
+                </Typography>
+                <Typography
+                  variant="body1"
+                  fontWeight="900"
+                  color="primary.main"
+                >
+                  {loading
+                    ? "..."
+                    : (combinedStats.periodTotals.umum.total || 0) +
+                      (combinedStats.periodTotals.gigi.total || 0)}{" "}
+                  Pasien
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
         </Box>
-
-        <TableContainer sx={{ border: "1px solid #F1F5F9", borderRadius: "16px" }}>
-          <Table>
-            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 800, color: "#475569" }}>DAPARTEMEN / POLI</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569" }}>TOTAL PASIEN</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, color: "#10B981" }}>PASIEN BARU</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, color: "#F59E0B" }}>PASIEN LAMA</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {/* Poli Umum */}
-              <TableRow hover>
-                <TableCell sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#4F46E5" }} />
-                  <Typography variant="body2" fontWeight="700" color="#334155">Poli Umum</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800">{loading ? "..." : (combinedStats.periodTotals.umum.total || 0).toLocaleString()}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800" color="#10B981">{loading ? "..." : (combinedStats.periodTotals.umum.baru || 0).toLocaleString()}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800" color="#F59E0B">{loading ? "..." : (combinedStats.periodTotals.umum.lama || 0).toLocaleString()}</Typography>
-                </TableCell>
-              </TableRow>
-
-              {/* Poli Gigi */}
-              <TableRow hover>
-                <TableCell sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#DB2777" }} />
-                  <Typography variant="body2" fontWeight="700" color="#334155">Poli Gigi</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800">{loading ? "..." : (combinedStats.periodTotals.gigi.total || 0).toLocaleString()}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800" color="#10B981">{loading ? "..." : (combinedStats.periodTotals.gigi.baru || 0).toLocaleString()}</Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body2" fontWeight="800" color="#F59E0B">{loading ? "..." : (combinedStats.periodTotals.gigi.lama || 0).toLocaleString()}</Typography>
-                </TableCell>
-              </TableRow>
-
-              {/* TOTAL GABUNGAN */}
-              <TableRow sx={{ bgcolor: "#F8FAFC" }}>
-                <TableCell sx={{ fontWeight: 900, color: "#1E293B", fontSize: "0.95rem" }}>
-                  TOTAL GABUNGAN
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body1" fontWeight="900" color="primary.main">
-                    {loading ? "..." : (combinedStats.totalBothPoli || 0).toLocaleString()}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body1" fontWeight="900" color="#10B981">
-                    {loading ? "..." : (combinedStats.totalBaru || 0).toLocaleString()}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Typography variant="body1" fontWeight="900" color="#F59E0B">
-                    {loading ? "..." : (combinedStats.totalLama || 0).toLocaleString()}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </TableContainer>
       </Paper>
 
       {/* Full Width Table Section: Rekap Total Kunjungan Per Periode */}
@@ -1226,134 +1356,8 @@ export default function DashboardPage() {
         </TableContainer>
       </Paper>
 
-      {/* Full Width Table Section: Rekap Tahunan Jenis Pasien */}
-      <Paper
-        elevation={0}
-        sx={{
-          mb: 5,
-          p: 3,
-          borderRadius: "24px",
-          border: "1px solid #F1F5F9",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          mb={3}
-          flexWrap="wrap"
-          gap={2}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <AssignmentIcon sx={{ color: "primary.main", fontSize: 32 }} />
-            <Box>
-              <Typography variant="h5" fontWeight="800" color="#1E293B">
-                Rekap Jenis Pasien Tahunan {tableYear}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total Pasien Baru dan Lama Berdasarkan Poli yang Dipilih
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box display="flex" gap={2}>
-            <FormControl sx={{ minWidth: 140 }}>
-              <InputLabel id="annual-poli-label">Pilih Poli</InputLabel>
-              <Select
-                labelId="annual-poli-label"
-                value={annualTypePoli}
-                label="Pilih Poli"
-                size="small"
-                onChange={(e) => setAnnualTypePoli(e.target.value as "umum" | "gigi" | "gabungan")}
-                sx={{ borderRadius: "12px", bgcolor: "white" }}
-              >
-                <MenuItem value="umum">Poli Umum</MenuItem>
-                <MenuItem value="gigi">Poli Gigi</MenuItem>
-                <MenuItem value="gabungan">Gabungan</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
-
-        <TableContainer>
-          <Table>
-            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-              <TableRow>
-                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", fontSize: "0.90rem" }}>
-                  KATEGORI JENIS PASIEN
-                </TableCell>
-                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", fontSize: "0.90rem" }}>
-                  TOTAL KUNJUNGAN TAHUNAN
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loadingPeriodic ? (
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 6 }}>
-                    <CircularProgress size={32} />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                <>
-                  <TableRow hover>
-                    <TableCell align="center">
-                      <Box display="flex" alignItems="center" justifyContent="center" gap={1.5}>
-                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#10B981" }} />
-                        <Typography variant="body2" fontWeight="700" color="#334155">TOTAL PASIEN BARU</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="h6" fontWeight="800" color="#10B981">
-                        {periodicRekap.reduce((acc, period) => {
-                          if (annualTypePoli === "umum") return acc + (period.umumBaru || 0);
-                          if (annualTypePoli === "gigi") return acc + (period.gigiBaru || 0);
-                          return acc + (period.umumBaru || 0) + (period.gigiBaru || 0);
-                        }, 0).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow hover>
-                    <TableCell align="center">
-                      <Box display="flex" alignItems="center" justifyContent="center" gap={1.5}>
-                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#F59E0B" }} />
-                        <Typography variant="body2" fontWeight="700" color="#334155">TOTAL PASIEN LAMA</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="h6" fontWeight="800" color="#F59E0B">
-                        {periodicRekap.reduce((acc, period) => {
-                          if (annualTypePoli === "umum") return acc + (period.umumLama || 0);
-                          if (annualTypePoli === "gigi") return acc + (period.gigiLama || 0);
-                          return acc + (period.umumLama || 0) + (period.gigiLama || 0);
-                        }, 0).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow sx={{ bgcolor: "#F8FAFC" }}>
-                    <TableCell align="center" sx={{ fontWeight: 900, color: "#1E293B", fontSize: "0.95rem" }}>
-                      GRAND TOTAL TAHUNAN
-                    </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="h5" fontWeight="900" color="primary.main">
-                        {periodicRekap.reduce((acc, period) => {
-                          if (annualTypePoli === "umum") return acc + (period.umum || 0);
-                          if (annualTypePoli === "gigi") return acc + (period.gigi || 0);
-                          return acc + (period.total || 0);
-                        }, 0).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+      {/* Rekap Rujukan Component - Restored with Export Integration */}
+      <ReferralSummary onDataReady={(data) => setTopReferralData(data)} />
     </Box>
   );
 }
