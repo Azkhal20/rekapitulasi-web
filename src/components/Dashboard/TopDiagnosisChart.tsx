@@ -78,14 +78,22 @@ export default function TopDiagnosisChart({
           const rawDiag = p.DIAGNOSIS || "";
           if (rawDiag && rawDiag !== "-" && rawDiag.trim() !== "") {
             // Pecah berdasarkan pola penomoran "1. ", "2. ", dst atau baris baru
+            // 1. Split by numbering pattern (e.g., "1. Diag A 2. Diag B")
             const parts = rawDiag
               .split(/\d+\.\s+/)
               .map((p) => p.trim())
               .filter((p) => p !== "");
 
+            // 2. Process each part: Treat "." as a terminator (strip tooth numbers like . 12, . 13)
             parts.forEach((part) => {
-              // Simpan sebagai satu diagnosa utuh (termasuk titik/keterangan gigi) sesuai permintaan user
-              const cleanName = part.toUpperCase();
+              // Take everything before the first period if it exists
+              // Example: "KARIES DENTIN. 12" -> "KARIES DENTIN"
+              const firstPeriodIndex = part.indexOf(".");
+              const diagNameRaw = firstPeriodIndex !== -1 
+                ? part.substring(0, firstPeriodIndex).trim() 
+                : part.trim();
+
+              const cleanName = diagNameRaw.toUpperCase();
               if (cleanName) {
                 diagnosisCounts[cleanName] =
                   (diagnosisCounts[cleanName] || 0) + 1;

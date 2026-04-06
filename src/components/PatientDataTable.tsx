@@ -457,7 +457,7 @@ export default function PatientDataTable({
     if (selectedIds.length === 0) return;
 
     MySwal.fire({
-      title: "Hapus Data Terpilih?",
+      title: "Hapus Beberapa Data?",
       text: `Anda akan menghapus ${selectedIds.length} data pasien sekaligus. Tindakan ini tidak dapat dibatalkan!`,
       icon: "warning",
       showCancelButton: true,
@@ -499,13 +499,13 @@ export default function PatientDataTable({
     });
   };
 
-  const handleDeletePatient = (patient: any) => {
+  const handleDeletePatient = (patient: Patient | PatientData) => {
     const id = Number(getRowValue(patient, "id"));
     const nama = String(getRowValue(patient, "NAMA") || "Pasien ini");
 
     MySwal.fire({
-      title: "Hapus Data Pasien?",
-      html: `Apakah Anda yakin ingin menghapus data <b>${nama}</b>?`,
+      title: "Konfirmasi Hapus",
+      html: `Apakah Anda yakin ingin menghapus data pasien <b>${nama}</b>?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#FF4C51",

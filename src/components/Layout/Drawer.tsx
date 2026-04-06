@@ -166,7 +166,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
               sx={{
                 fontWeight: 800,
                 lineHeight: 1.1,
-                color: "#566a7f",
+                color: "#1E293B",
                 fontSize: "1.25rem",
                 fontFamily: "inherit",
               }}
@@ -176,7 +176,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
             <Typography
               variant="caption"
               sx={{
-                color: "#a1acb8",
+                color: "#64748B",
                 display: "block",
                 fontSize: "0.65rem",
                 fontWeight: 600,
@@ -206,8 +206,8 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                     mb: 1,
                     display: "block",
                     fontWeight: 700,
-                    color: "#a1acb8",
-                    opacity: 0.8,
+                    color: "#475569",
+                    opacity: 1,
                     fontSize: "0.75rem",
                     letterSpacing: "0.5px",
                   }}
@@ -235,9 +235,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                             justifyContent: open ? "initial" : "center",
                             px: 2,
                             borderRadius: 2,
-                            color: isChildActive
-                              ? "primary.main"
-                              : "text.primary",
+                            color: isChildActive ? "primary.main" : "#334155",
                             backgroundColor:
                               isChildActive && !isOpen
                                 ? "rgba(105, 108, 255, 0.08)"
@@ -252,7 +250,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                               minWidth: 0,
                               mr: open ? 1.5 : "auto",
                               justifyContent: "center",
-                              color: isChildActive ? "inherit" : "#566a7f",
+                              color: isChildActive ? "inherit" : "#334155",
                             }}
                           >
                             {item.icon}
@@ -290,7 +288,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                                   mb: 0.5,
                                   color: isActive
                                     ? "primary.main"
-                                    : "text.secondary",
+                                    : "#475569",
                                   backgroundColor: isActive
                                     ? "rgba(105, 108, 255, 0.16) !important"
                                     : "transparent",
@@ -304,7 +302,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                                     minWidth: 0,
                                     mr: open ? 2 : "auto",
                                     justifyContent: "center",
-                                    color: isActive ? "inherit" : "#566a7f",
+                                    color: isActive ? "inherit" : "#334155",
                                     display: open ? "flex" : "none",
                                   }}
                                 >
@@ -343,14 +341,14 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                         justifyContent: open ? "initial" : "center",
                         px: 2,
                         borderRadius: 2,
-                        color: isActive ? "primary.main" : "text.primary",
+                        color: isActive ? "primary.main" : "#334155",
                         backgroundColor: isActive
                           ? "rgba(105, 108, 255, 0.16) !important"
                           : "transparent",
                         transition: "all 0.2s ease-in-out",
                         "&:hover": {
                           backgroundColor: "rgba(69, 75, 87, 0.04)",
-                          color: isActive ? "primary.main" : "#435971",
+                          color: isActive ? "primary.main" : "#1E293B",
                         },
                       }}
                     >
@@ -359,7 +357,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                           minWidth: 0,
                           mr: open ? 1.5 : "auto",
                           justifyContent: "center",
-                          color: isActive ? "inherit" : "#566a7f",
+                          color: isActive ? "inherit" : "#334155",
                         }}
                       >
                         {item.icon}

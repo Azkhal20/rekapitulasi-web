@@ -134,15 +134,15 @@ export default function Header({
             >
               <Typography
                 variant="subtitle2"
-                sx={{ fontWeight: 600, lineHeight: 1.3, color: "#566a7f" }}
+                sx={{ fontWeight: 600, lineHeight: 1.3, color: "#1E293B" }}
               >
-                {formatRole(userInfo.fullName)}
+                {userInfo.fullName}
               </Typography>
               <Typography
                 variant="caption"
-                sx={{ color: "#a1acb8", display: "block", fontSize: "0.75rem" }}
+                sx={{ color: "#475569", display: "block", fontSize: "0.75rem" }}
               >
-                {userInfo.role}
+                {formatRole(userInfo.role)}
               </Typography>
             </Box>
             <IconButton

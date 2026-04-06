@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Box,
   Card,
@@ -37,6 +37,7 @@ import {
   PoliType,
   PatientData,
 } from "@/services/patientService";
+import ReferralSummary, { ReferralExportData } from "@/components/Dashboard/ReferralSummary";
 import { exportDashboardToExcel } from "@/utils/exportDashboardToExcel";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -84,6 +85,9 @@ export default function DashboardPage() {
   const [topDiagnosisData, setTopDiagnosisData] = useState<
     Array<{ name: string; count: number }>
   >([]);
+  const [topReferralData, setTopReferralData] = useState<ReferralExportData | null>(
+    null,
+  );
   const { isSuperAdmin, isAdmin } = usePermissions();
 
   useEffect(() => {
@@ -98,37 +102,25 @@ export default function DashboardPage() {
   });
   const [periodicRekap, setPeriodicRekap] = useState<PeriodicData[]>([]);
   const [loadingPeriodic, setLoadingPeriodic] = useState(false);
+  const [rawDataUmum, setRawDataUmum] = useState<Record<string, PatientData[]>>({});
+  const [rawDataGigi, setRawDataGigi] = useState<Record<string, PatientData[]>>({});
+
+  const externalData = useMemo(() => ({
+    umum: rawDataUmum,
+    gigi: rawDataGigi
+  }), [rawDataUmum, rawDataGigi]);
+
 
   const fetchPeriodicRekap = useCallback(async () => {
     try {
       setLoadingPeriodic(true);
+      setLoading(true);
       const yearNum = parseInt(tableYear);
 
-      // Generate exact 13 periods requested by user
       const generatePeriods = (year: number) => {
-        interface PeriodDef {
-          label: string;
-          startDate: Date;
-          endDate: Date;
-          monthsInvolved: string[];
-        }
-        const periods: PeriodDef[] = [];
-        const MONTH_NAMES = [
-          "Januari",
-          "Februari",
-          "Maret",
-          "April",
-          "Mei",
-          "Juni",
-          "Juli",
-          "Agustus",
-          "September",
-          "Oktober",
-          "November",
-          "Desember",
-        ];
-
-        // 1. 1 Jan - 15 Jan
+        const periods = [];
+        const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        
         periods.push({
           label: `1 Januari ${year} - 15 Januari ${year}`,
           startDate: new Date(year, 0, 1),
@@ -136,129 +128,78 @@ export default function DashboardPage() {
           monthsInvolved: [`JANUARI ${year}`],
         });
 
-        // 2-12. 16 [M] - 15 [M+1]
         for (let m = 0; m < 11; m++) {
-          const dStart = new Date(year, m, 16);
-          const dEnd = new Date(year, m + 1, 15);
-          const m1Name = `${MONTH_NAMES[m].toUpperCase()} ${year}`;
-          const m2Name = `${MONTH_NAMES[m + 1].toUpperCase()} ${year}`;
           periods.push({
             label: `16 ${MONTH_NAMES[m]} ${year} - 15 ${MONTH_NAMES[m + 1]} ${year}`,
-            startDate: dStart,
-            endDate: dEnd,
-            monthsInvolved: Array.from(new Set([m1Name, m2Name])),
+            startDate: new Date(year, m, 16),
+            endDate: new Date(year, m + 1, 15),
+            monthsInvolved: Array.from(new Set([`${MONTH_NAMES[m].toUpperCase()} ${year}`, `${MONTH_NAMES[m + 1].toUpperCase()} ${year}`])),
           });
         }
 
-        // 13. 16 Des - 31 Des
         periods.push({
           label: `16 Desember ${year} - 31 Desember ${year}`,
           startDate: new Date(year, 11, 16),
           endDate: new Date(year, 11, 31),
           monthsInvolved: [`DESEMBER ${year}`],
         });
-
         return periods;
       };
 
       const periods = generatePeriods(yearNum);
-      const allMonths = Array.from(
-        new Set(periods.flatMap((p) => p.monthsInvolved)),
-      );
-
-      const fetchAll = async (poli: PoliType) => {
-        const promises = allMonths.map((m) =>
-          patientService.getAllPatients(m, poli).catch(() => []),
-        );
-        const results = await Promise.all(promises);
-        const map: Record<string, PatientData[]> = {};
-        allMonths.forEach((m, i) => (map[m] = results[i]));
-        return map;
+      
+      // MIMIC REPORTS logic: Fetch each month involved individually
+      // This is proven to work in Laporan Periodik
+      const fetchMonthData = async (mName: string, poli: PoliType) => {
+        try {
+          return await patientService.getAllPatients(mName, poli);
+        } catch (err) {
+          console.warn(`Gagal mengambil ${poli} untuk ${mName}`, err);
+          return [] as PatientData[];
+        }
       };
 
-      const [umumMap, gigiMap] = await Promise.all([
-        fetchAll("umum"),
-        fetchAll("gigi"),
-      ]);
+      const rekap = await Promise.all(periods.map(async (period) => {
+        const fetchAllForPeriod = async (poli: PoliType) => {
+          const promises = period.monthsInvolved.map(mName => fetchMonthData(mName, poli));
+          const results = await Promise.all(promises);
+          return results.flat();
+        };
 
-      const rekap = periods.map((period) => {
-        const calculateTotals = (data: PatientData[]) => {
-          let countL = 0;
-          let countP = 0;
+        const [umumData, gigiData] = await Promise.all([
+          fetchAllForPeriod("umum"),
+          fetchAllForPeriod("gigi"),
+        ]);
 
-          data.forEach((p) => {
-            if (!p.TANGGAL) return;
-            // Validasi baris data: Hindari baris header/subheader
-            const tglStr = String(p.TANGGAL).trim().toLowerCase();
-            if (tglStr === "tanggal" || tglStr === "tgl") return;
+        const countInPeriod = (data: PatientData[]) => {
+          const start = new Date(period.startDate.getFullYear(), period.startDate.getMonth(), period.startDate.getDate());
+          const end = new Date(period.endDate.getFullYear(), period.endDate.getMonth(), period.endDate.getDate());
 
+          return data.filter(p => {
+            if (!p.TANGGAL || String(p.TANGGAL).toUpperCase().includes("TANGGAL")) return false;
             const pDate = parseRowDate(String(p.TANGGAL));
-            // Fix off-by-1 error: endDate should include the entire day
-            const periodEndDateInclusive = new Date(
-              period.endDate.getFullYear(),
-              period.endDate.getMonth(),
-              period.endDate.getDate() + 1,
-            );
-
-            if (
-              !isNaN(pDate.getTime()) &&
-              pDate >= period.startDate &&
-              pDate < periodEndDateInclusive
-            ) {
-              // Validasi tambahan untuk L/P: Pastikan bukan header "L" atau "P"
-              const valL = String(p.L || "").trim();
-              const valP = String(p.P || "").trim();
-
-              if (
-                valL &&
-                valL !== "-" &&
-                valL !== "0" &&
-                valL.toLowerCase() !== "l"
-              )
-                countL++;
-              if (
-                valP &&
-                valP !== "-" &&
-                valP !== "0" &&
-                valP.toLowerCase() !== "p"
-              )
-                countP++;
-            }
-          });
-          return { L: countL, P: countP, total: countL + countP };
+            if (isNaN(pDate.getTime())) return false;
+            
+            const check = new Date(pDate.getFullYear(), pDate.getMonth(), pDate.getDate());
+            return check >= start && check <= end;
+          }).length;
         };
 
-        const periodUmum = { L: 0, P: 0, total: 0 };
-        const periodGigi = { L: 0, P: 0, total: 0 };
+        const uCount = countInPeriod(umumData);
+        const gCount = countInPeriod(gigiData);
 
-        period.monthsInvolved.forEach((m) => {
-          const u = calculateTotals(umumMap[m] || []);
-          const g = calculateTotals(gigiMap[m] || []);
-
-          periodUmum.L += u.L;
-          periodUmum.P += u.P;
-          periodUmum.total += u.total;
-
-          periodGigi.L += g.L;
-          periodGigi.P += g.P;
-          periodGigi.total += g.total;
-        });
-
-        return {
-          label: period.label,
-          total: periodUmum.total + periodGigi.total,
-          umum: periodUmum.total,
-          gigi: periodGigi.total,
-        };
-      });
+        return { label: period.label, total: uCount + gCount, umum: uCount, gigi: gCount };
+      }));
 
       setPeriodicRekap(rekap);
     } catch (err) {
       console.error("Gagal memuat rekap berkala:", err);
     } finally {
+      setLoading(false);
       setLoadingPeriodic(false);
     }
-  }, [tableYear]);
+  }, [tableYear, periodName, selectedPoli]);
+
 
   useEffect(() => {
     fetchPeriodicRekap();
@@ -319,48 +260,34 @@ export default function DashboardPage() {
     const cleanStr = dateStr.trim();
     const d = new Date(cleanStr);
     if (!isNaN(d.getTime())) return d;
+
     const parts = cleanStr.split(/[\s-/]+/);
     if (parts.length >= 3) {
       let day: number, monthIndex: number | undefined, year: number;
+
+      // Kasus: YYYY-MM-DD
       if (parts[0].length === 4 && !isNaN(parseInt(parts[0]))) {
         year = parseInt(parts[0]);
         monthIndex = parseInt(parts[1]) - 1;
         day = parseInt(parts[2]);
       } else {
+        // Kasus: DD-MM-YYYY atau DD Bulan YYYY
         day = parseInt(parts[0]);
         const monthRaw = parts[1].toLowerCase();
         year = parseInt(parts[2]);
+
         if (!isNaN(parseInt(monthRaw))) {
           monthIndex = parseInt(monthRaw) - 1;
         } else {
           const monthsID: Record<string, number> = {
-            januari: 0,
-            februari: 1,
-            maret: 2,
-            april: 3,
-            mei: 4,
-            juni: 5,
-            juli: 6,
-            agustus: 7,
-            september: 8,
-            oktober: 9,
-            november: 10,
-            desember: 11,
-            jan: 0,
-            feb: 1,
-            mar: 2,
-            apr: 3,
-            jun: 5,
-            jul: 6,
-            ags: 7,
-            sep: 8,
-            okt: 9,
-            nov: 10,
-            des: 11,
+            januari: 0, februari: 1, maret: 2, april: 3, mei: 4, juni: 5, juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11,
+            jan: 0, feb: 1, mar: 2, apr: 3, mei_sh: 4, jun: 5, jul: 6, ags: 7, sep: 8, okt: 9, nov: 10, des: 11,
+            may: 4, oct: 9, dec: 11, agst: 7, sept: 8
           };
           monthIndex = monthsID[monthRaw];
         }
       }
+
       if (monthIndex !== undefined && !isNaN(day) && !isNaN(year)) {
         if (monthIndex >= 0 && monthIndex <= 11 && day >= 1 && day <= 31) {
           return new Date(year, monthIndex, day);
@@ -373,133 +300,72 @@ export default function DashboardPage() {
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await patientService.getAllPatients(
-        periodName,
-        selectedPoli,
-      );
+      // Derive data from bulk map if available, otherwise fetch specifically (fallback)
+      const cached = (selectedPoli === "gigi" ? rawDataGigi[periodName] : rawDataUmum[periodName]);
+      const data = cached || await patientService.getAllPatients(periodName, selectedPoli);
 
       const total = data.length;
-
-      // Today's Date in Local Format (YYYY-MM-DD)
       const now = new Date();
-      const y = now.getFullYear();
-      const m = (now.getMonth() + 1).toString().padStart(2, "0");
-      const d = now.getDate().toString().padStart(2, "0");
-      const todayStr = `${y}-${m}-${d}`;
+      const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now.getDate().toString().padStart(2, "0")}`;
 
       const todayData = data.filter((p) => {
         if (!p.TANGGAL) return false;
         const pDateObj = parseRowDate(String(p.TANGGAL));
         if (isNaN(pDateObj.getTime())) return false;
-
-        const pYear = pDateObj.getFullYear();
-        const pMonth = (pDateObj.getMonth() + 1).toString().padStart(2, "0");
-        const pDay = pDateObj.getDate().toString().padStart(2, "0");
-        const pDateStr = `${pYear}-${pMonth}-${pDay}`;
-
-        return pDateStr === todayStr;
+        return `${pDateObj.getFullYear()}-${(pDateObj.getMonth() + 1).toString().padStart(2, "0")}-${pDateObj.getDate().toString().padStart(2, "0")}` === todayStr;
       });
 
-      const todayCount = todayData.length;
-
-      let countL = 0;
-      let countP = 0;
-      let countBaru = 0;
-      let countLama = 0;
+      let countL = 0, countP = 0, countBaru = 0, countLama = 0;
       todayData.forEach((p) => {
-        if (isFilled(p.L)) countL++;
-        if (isFilled(p.P)) countP++;
-        if (isFilled(p.BARU)) countBaru++;
-        if (isFilled(p.LAMA)) countLama++;
+        if (isFilled(p.L)) countL++; if (isFilled(p.P)) countP++;
+        if (isFilled(p.BARU)) countBaru++; if (isFilled(p.LAMA)) countLama++;
       });
 
       setStatsData({
         totalPatients: total,
-        todayPatients: todayCount,
+        todayPatients: todayData.length,
         todayGender: { L: countL, P: countP },
         todayType: { baru: countBaru, lama: countLama },
       });
     } catch (error) {
       console.error(`Failed to fetch stats:`, error);
-      setStatsData({
-        totalPatients: 0,
-        todayPatients: 0,
-        todayGender: { L: 0, P: 0 },
-        todayType: { baru: 0, lama: 0 },
-      });
     } finally {
       setLoading(false);
     }
-  }, [selectedPoli, periodName]);
+  }, [selectedPoli, periodName, rawDataUmum, rawDataGigi]);
+
 
   const fetchCombinedStats = useCallback(async () => {
     try {
-      // Fetch data dari kedua poli secara paralel
-      const [dataUmum, dataGigi] = await Promise.all([
-        patientService.getAllPatients(periodName, "umum"),
-        patientService.getAllPatients(periodName, "gigi"),
-      ]);
+      // Derive data from bulk maps if possible
+      const dataUmum = rawDataUmum[periodName] || await patientService.getAllPatients(periodName, "umum");
+      const dataGigi = rawDataGigi[periodName] || await patientService.getAllPatients(periodName, "gigi");
 
-      // Hitung total untuk Umum
-      const resUmumTotal = dataUmum.length;
-      let resUmumL = 0;
-      let resUmumP = 0;
-      dataUmum.forEach((p) => {
-        if (isFilled(p.L)) resUmumL++;
-        if (isFilled(p.P)) resUmumP++;
-      });
+      const calculateTotals = (data: PatientData[]) => {
+        let L = 0, P = 0, baru = 0, lama = 0;
+        data.forEach(p => {
+          if (isFilled(p.L)) L++; if (isFilled(p.P)) P++;
+          if (isFilled(p.BARU)) baru++; if (isFilled(p.LAMA)) lama++;
+        });
+        return { total: data.length, L, P, baru, lama };
+      };
 
-      // Hitung total untuk Gigi
-      const resGigiTotal = dataGigi.length;
-      let resGigiL = 0;
-      let resGigiP = 0;
-      dataGigi.forEach((p) => {
-        if (isFilled(p.L)) resGigiL++;
-        if (isFilled(p.P)) resGigiP++;
-      });
+      const u = calculateTotals(dataUmum);
+      const g = calculateTotals(dataGigi);
 
       setCombinedStats({
-        totalBothPoli: resUmumTotal + resGigiTotal,
-        totalL: resUmumL + resGigiL,
-        totalP: resUmumP + resGigiP,
-        totalBaru:
-          dataUmum.filter((p) => isFilled(p.BARU)).length +
-          dataGigi.filter((p) => isFilled(p.BARU)).length,
-        totalLama:
-          dataUmum.filter((p) => isFilled(p.LAMA)).length +
-          dataGigi.filter((p) => isFilled(p.LAMA)).length,
-        periodTotals: {
-          umum: {
-            total: resUmumTotal,
-            L: resUmumL,
-            P: resUmumP,
-            baru: dataUmum.filter((p) => isFilled(p.BARU)).length,
-            lama: dataUmum.filter((p) => isFilled(p.LAMA)).length,
-          },
-          gigi: {
-            total: resGigiTotal,
-            L: resGigiL,
-            P: resGigiP,
-            baru: dataGigi.filter((p) => isFilled(p.BARU)).length,
-            lama: dataGigi.filter((p) => isFilled(p.LAMA)).length,
-          },
-        },
+        totalBothPoli: u.total + g.total,
+        totalL: u.L + g.L,
+        totalP: u.P + g.P,
+        totalBaru: u.baru + g.baru,
+        totalLama: u.lama + g.lama,
+        periodTotals: { umum: u, gigi: g },
       });
     } catch (error) {
       console.error("Failed to fetch combined stats:", error);
-      setCombinedStats({
-        totalBothPoli: 0,
-        totalL: 0,
-        totalP: 0,
-        totalBaru: 0,
-        totalLama: 0,
-        periodTotals: {
-          umum: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
-          gigi: { total: 0, L: 0, P: 0, baru: 0, lama: 0 },
-        },
-      });
     }
-  }, [periodName]);
+  }, [periodName, rawDataUmum, rawDataGigi]);
+
 
   useEffect(() => {
     if (isStorageLoaded) {
@@ -526,16 +392,20 @@ export default function DashboardPage() {
       topDiagnosis: topDiagnosisData,
       periodicRekap: periodicRekap,
       selectedPoli: selectedPoli,
+      referralData: topReferralData,
     });
   };
 
-  // Callback untuk menerima data diagnosis dari TopDiagnosisChart
   const handleDiagnosisDataReady = useCallback(
     (data: Array<{ name: string; count: number }>) => {
       setTopDiagnosisData(data);
     },
     [],
   );
+
+  const handleReferralDataReady = useCallback((data: ReferralExportData) => {
+    setTopReferralData(data);
+  }, []);
 
   const stats = [
     {
@@ -868,18 +738,17 @@ export default function DashboardPage() {
         </Paper>
       </Box>
 
-      {/* Ringkasan Gabungan (Umum & Gigi) */}
-      {/* Ringkasan Gabungan (Umum & Gigi) */}
+      {/* Ringkasan Gabungan (Umum & Gigi) - Reverted to Original Card Style */}
       <Paper
         elevation={0}
         sx={{
           mb: 5,
-          mt: 4, // Added spacing from top sections
+          mt: 4,
           p: 3,
           borderRadius: "24px",
           border: "1px solid #F1F5F9",
-          bgcolor: "white", // Changed to white
-          boxShadow: "0 4px 20px rgba(0,0,0,0.04)", // Added shadow
+          bgcolor: "white",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
         }}
       >
         <Typography
@@ -958,8 +827,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card: Perincian Per Periode (Bulan Ini) */}
-          {/* Card: Tipe Pasien (Baru & Lama) - Reverted to Original List Style */}
+          {/* Card: Tipe Pasien (Baru & Lama) - Original List Style */}
           <Card
             sx={{
               borderRadius: "24px",
@@ -1035,8 +903,8 @@ export default function DashboardPage() {
                     >
                       {loading
                         ? "..."
-                        : combinedStats.periodTotals.umum.baru +
-                          combinedStats.periodTotals.umum.lama}{" "}
+                        : (combinedStats.periodTotals.umum.baru || 0) +
+                          (combinedStats.periodTotals.umum.lama || 0)}{" "}
                       Pasien
                     </Typography>
                     <Typography
@@ -1083,8 +951,8 @@ export default function DashboardPage() {
                     >
                       {loading
                         ? "..."
-                        : combinedStats.periodTotals.gigi.baru +
-                          combinedStats.periodTotals.gigi.lama}{" "}
+                        : (combinedStats.periodTotals.gigi.baru || 0) +
+                          (combinedStats.periodTotals.gigi.lama || 0)}{" "}
                       Pasien
                     </Typography>
                     <Typography
@@ -1120,8 +988,8 @@ export default function DashboardPage() {
                 >
                   {loading
                     ? "..."
-                    : combinedStats.periodTotals.umum.total +
-                      combinedStats.periodTotals.gigi.total}{" "}
+                    : (combinedStats.periodTotals.umum.total || 0) +
+                      (combinedStats.periodTotals.gigi.total || 0)}{" "}
                   Pasien
                 </Typography>
               </Box>
@@ -1351,6 +1219,9 @@ export default function DashboardPage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* Rekap Rujukan Component - Restored with Export Integration */}
+      <ReferralSummary onDataReady={handleReferralDataReady} externalData={externalData} />
     </Box>
   );
 }

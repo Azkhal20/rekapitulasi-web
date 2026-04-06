@@ -105,9 +105,13 @@ export interface ReferralExportData {
 
 interface ReferralSummaryProps {
   onDataReady?: (data: ReferralExportData) => void;
+  externalData?: {
+    umum: Record<string, PatientData[]>;
+    gigi: Record<string, PatientData[]>;
+  };
 }
 
-export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
+export default function ReferralSummary({ onDataReady, externalData }: ReferralSummaryProps) {
   const [loading, setLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState<string>(
     new Date().getFullYear().toString(),
@@ -127,20 +131,24 @@ export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
         { umum: PatientData[]; gigi: PatientData[] }
       > = {};
 
-      // Fetch for each month
-      const promises = MONTHS.map(async (month) => {
+      // Fetch for each month - SEQUENTIAL FETCH to avoid overwhelming GAS backend
+      // Using a for-of loop instead of Promise.all(map) ensures we don't hit GAS rate limits (24 parallel requests)
+      for (const month of MONTHS) {
         const sheetName = `${month} ${selectedYear}`;
-        const [umum, gigi] = await Promise.all([
-          patientService.getAllPatients(sheetName, "umum").catch(() => []),
-          patientService.getAllPatients(sheetName, "gigi").catch(() => []),
-        ]);
-        return { month, umum, gigi };
-      });
-
-      const monthResults = await Promise.all(promises);
-      monthResults.forEach((res) => {
-        results[res.month] = { umum: res.umum, gigi: res.gigi };
-      });
+        
+        try {
+          // We can still parallelize within a single month (umum + gigi = 2 requests)
+          const [umum, gigi] = await Promise.all([
+            patientService.getAllPatients(sheetName, "umum").catch(() => []),
+            patientService.getAllPatients(sheetName, "gigi").catch(() => []),
+          ]);
+          
+          results[month] = { umum, gigi };
+        } catch (monthError) {
+          console.error(`Error fetching data for ${month}:`, monthError);
+          results[month] = { umum: [], gigi: [] };
+        }
+      }
 
       setData(results);
     } catch (error) {
@@ -151,8 +159,23 @@ export default function ReferralSummary({ onDataReady }: ReferralSummaryProps) {
   }, [selectedYear]);
 
   useEffect(() => {
+    // If we have external data, use it and skip internal fetch
+    if (externalData && (Object.keys(externalData.umum).length > 0 || Object.keys(externalData.gigi).length > 0)) {
+      const results: Record<string, { umum: PatientData[]; gigi: PatientData[] }> = {};
+      MONTHS.forEach(month => {
+        const key = `${month} ${selectedYear}`;
+        results[month] = {
+          umum: externalData.umum[key] || [],
+          gigi: externalData.gigi[key] || []
+        };
+      });
+      setData(results);
+      setLoading(false);
+      return;
+    }
+
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, externalData, selectedYear]);
 
   const isFilled = (val: unknown) => {
     if (!val) return false;

@@ -125,7 +125,7 @@ export default function UserManagementPage() {
         }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={800} color="#566a7f">
+          <Typography variant="h4" fontWeight={800}>
             Manajemen Pengguna
           </Typography>
           <Typography variant="body2" color="#a1acb8">
@@ -163,10 +163,10 @@ export default function UserManagementPage() {
         <Table>
           <TableHead sx={{ backgroundColor: "#F5F5F9" }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>Username</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Nama Lengkap</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
-              <TableCell sx={{ fontWeight: 600, textAlign: "center" }}>
+              <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Username</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nama Lengkap</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Role</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: "#334155", textAlign: "center" }}>
                 Aksi
               </TableCell>
             </TableRow>
@@ -184,7 +184,14 @@ export default function UserManagementPage() {
                   <TableCell sx={{ fontWeight: 500 }}>
                     {user.username}
                   </TableCell>
-                  <TableCell>{user.fullName}</TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 600, lineHeight: 1.3, color: "#1E293B" }}
+                    >
+                      {user.fullName}
+                    </Typography>
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={user.role.toUpperCase()}

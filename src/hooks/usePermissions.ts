@@ -36,7 +36,7 @@ export const usePermissions = () => {
   
   const canCreate = isSuperAdmin || isAdmin || isOperator;
   const canEdit = isSuperAdmin || isAdmin || isOperator;
-  const canDelete = isSuperAdmin || isAdmin; // Maybe restrict delete for Operator? For now, allow if Admin.
+  const canDelete = isSuperAdmin || isAdmin || isOperator; // Operator and Admin are same now
 
   return {
     role,
