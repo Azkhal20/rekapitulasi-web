@@ -115,8 +115,7 @@ export default function UserDialog({
               }
             >
               <MenuItem value="super_admin">Super Admin</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="operator">Operator</MenuItem>
+              <MenuItem value="admin">Admin / Operator</MenuItem>
               <MenuItem value="viewer">Viewer</MenuItem>
             </Select>
           </FormControl>

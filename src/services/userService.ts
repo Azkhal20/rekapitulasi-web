@@ -15,10 +15,18 @@ export const userService = {
       if (!response.ok) throw new Error("Gagal mengambil data user");
       const data = await response.json();
       
-      // Map GAS fields to frontend User interface (handling potential uppercase keys)
-      return data.map((u: Record<string, any>) => ({
-        username: u.username || u.USERNAME || "",
-        fullName: u.fullName || u.NAMA_LENGKAP || u.FULLNAME || "",
+      // Map GAS fields to frontend User interface (handling potential uppercase keys & underscores)
+      return data.map((u: Record<string, unknown>) => ({
+        username: u.username || u.USERNAME || u.ID || "",
+        fullName:
+          u.fullName ||
+          u.NAMA_LENGKAP ||
+          u.FULLNAME ||
+          u.NAMA ||
+          u.FULL_NAME ||
+          u.full_name ||
+          u.fullName ||
+          "",
         role: u.role || u.ROLE || "admin",
         password: u.password || u.PASSWORD || "",
         id: u.id || u.ID || "",
