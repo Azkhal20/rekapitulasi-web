@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   Box,
   Card,
@@ -31,15 +32,25 @@ import WcIcon from "@mui/icons-material/Wc";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import DownloadIcon from "@mui/icons-material/Download";
-import TopDiagnosisChart from "@/components/Dashboard/TopDiagnosisChart";
 import {
   patientService,
   PoliType,
   PatientData,
 } from "@/services/patientService";
-import ReferralSummary, { ReferralExportData } from "@/components/Dashboard/ReferralSummary";
 import { exportDashboardToExcel } from "@/utils/exportDashboardToExcel";
 import { usePermissions } from "@/hooks/usePermissions";
+
+// Lazy load komponen berat agar tidak memblokir LCP (first render)
+const TopDiagnosisChart = dynamic(
+  () => import("@/components/Dashboard/TopDiagnosisChart"),
+  { loading: () => <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress size={32} /></Box>, ssr: false }
+);
+const ReferralSummary = dynamic(
+  () => import("@/components/Dashboard/ReferralSummary"),
+  { loading: () => <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress size={32} /></Box>, ssr: false }
+);
+
+import type { ReferralExportData } from "@/components/Dashboard/ReferralSummary";
 
 interface PeriodicData {
   label: string;
