@@ -142,8 +142,15 @@ function getAllPatientsRaw(sheet) {
   // Create column mapping dynamically
   const colIndex = {};
   COLUMN_MAPPING.forEach(key => {
-    // Search for matching header
-    const idx = headers.findIndex(h => h === key || h === key.replace("_", " ") || h.includes(key));
+    // Search for matching header - Prioritize exact match, then replace _ with space
+    let idx = headers.indexOf(key);
+    if (idx === -1) idx = headers.indexOf(key.replace("_", " "));
+    
+    // For single letter columns (L, P), ONLY allow exact match to prevent matching TANGGAL or other words
+    if (idx === -1 && key.length > 1) {
+      idx = headers.findIndex(h => h.includes(key));
+    }
+    
     colIndex[key] = idx;
   });
 
