@@ -896,8 +896,36 @@ export default function PatientFormDialog({
               label="Tindakan"
               value={formData.TINDAKAN}
               onChange={(e) => handleChange("TINDAKAN", e.target.value)}
+              onFocus={() => {
+                if (!formData.TINDAKAN) {
+                  setFormData((prev) => ({ ...prev, TINDAKAN: "1. " }));
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  const lines = formData.TINDAKAN.split("\n").filter(
+                    (l) => l.trim() !== "",
+                  );
+                  if (lines.length > 0) {
+                    e.preventDefault();
+                    const nextNum = lines.length + 1;
+                    const lastLine = lines[lines.length - 1];
+                    const hasTrailingNumber = /^\d+\.\s*$/.test(lastLine);
+
+                    if (!hasTrailingNumber) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        TINDAKAN: prev.TINDAKAN.trimEnd() + `\n${nextNum}. `,
+                      }));
+                    }
+                  }
+                }
+              }}
               fullWidth
+              multiline
+              rows={3}
               placeholder="Terapi Medis / Tindakan"
+              sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
             />
 
             <TextField
