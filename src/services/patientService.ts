@@ -40,7 +40,7 @@ class PatientService {
   private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   // Request bottleneck to prevent GAS concurrency limits
-  private activeRequests: Map<string, Promise<any>> = new Map();
+  private activeRequests: Map<string, Promise<PatientData[]>> = new Map();
   
   private getBaseUrl(poli: PoliType = 'umum'): string {
     const url = poli === 'gigi' 
@@ -81,7 +81,7 @@ class PatientService {
   }
 
   // INSTANCE QUEUE: Individual queue per poli/deployment to allow parallel loading of Umum vs Gigi
-  private requestQueue: Promise<any> = Promise.resolve();
+  private requestQueue: Promise<unknown> = Promise.resolve();
 
   // AMBIL SEMUA DATA (Optimized with Cache, Retry, & Sequential Per-Poli Queue)
   async getAllPatients(sheetName: string = "JANUARI", poli: PoliType = 'umum'): Promise<PatientData[]> {
