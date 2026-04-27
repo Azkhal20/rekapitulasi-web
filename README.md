@@ -1,5 +1,7 @@
 # Rekapitulasi Web — Dashboard Klinik
 
+[![CI](https://github.com/Azkhal20/rekapitulasi-web/actions/workflows/ci.yml/badge.svg)](https://github.com/Azkhal20/rekapitulasi-web/actions/workflows/ci.yml)
+
 Aplikasi web internal untuk manajemen data pasien dan rekapitulasi kunjungan klinik. Digunakan oleh staf klinik untuk pendaftaran pasien, pencatatan diagnosis, dan pelaporan periodik per poli (Poli Umum & Poli Gigi).
 
 ## Tech Stack
