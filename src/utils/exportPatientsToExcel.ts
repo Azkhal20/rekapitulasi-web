@@ -100,7 +100,7 @@ export async function exportPatientsToExcel({
   // Add Patient Data Rows
   patients.forEach((patient, idx) => {
     const row = sheet.getRow(currentRow);
-    const tipeDaftar = (patient.TIPE_DAFTAR || (patient as Record<string, unknown>)["Tipe Daftar"] || (patient as Record<string, unknown>)["TIPE DAFTAR"] || "Offline").trim();
+    const tipeDaftar = String(patient.TIPE_DAFTAR || (patient as unknown as Record<string, string>)["Tipe Daftar"] || (patient as unknown as Record<string, string>)["TIPE DAFTAR"] || "Offline").trim();
     
     row.values = [
       idx + 1,
@@ -117,10 +117,10 @@ export async function exportPatientsToExcel({
       patient.USIA || "-",
       patient.NIP || "-",
       tipeDaftar,
-      patient.OBS_TTV || (patient as Record<string, unknown>)["OBS TTV"] || "-",
+      patient.OBS_TTV || (patient as unknown as Record<string, string>)["OBS TTV"] || "-",
       patient.KELUHAN || "-",
       patient.DIAGNOSIS || "-",
-      patient.ICD10 || (patient as Record<string, unknown>)["ICD-10"] || "-",
+      patient.ICD10 || (patient as unknown as Record<string, string>)["ICD-10"] || "-",
       patient.TINDAKAN || "-",
       patient.OBAT || "-",
     ];

@@ -1438,9 +1438,9 @@ export default function PatientDataTable({
 
                         if (column === "NAMA") {
                           const tipeDaftar = String(
-                            (row as Record<string, unknown>).TIPE_DAFTAR ||
-                              (row as Record<string, unknown>)["Tipe Daftar"] ||
-                              (row as Record<string, unknown>)["TIPE DAFTAR"] ||
+                            (row as unknown as Record<string, string>).TIPE_DAFTAR ||
+                              (row as unknown as Record<string, string>)["Tipe Daftar"] ||
+                              (row as unknown as Record<string, string>)["TIPE DAFTAR"] ||
                               "Offline"
                           ).trim();
                           const isOnline = tipeDaftar.toLowerCase() === "online";
