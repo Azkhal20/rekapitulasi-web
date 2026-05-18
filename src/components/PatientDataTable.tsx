@@ -36,6 +36,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CheckboxIcon from "@mui/icons-material/CheckBox";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { Patient } from "@/types/patient";
 import PatientFormDialog from "./PatientFormDialog";
 import { PatientData, PoliType } from "@/services/patientService";
@@ -44,6 +45,7 @@ import withReactContent from "sweetalert2-react-content";
 import { usePatientMutations } from "@/hooks/usePatients";
 import { PatientSchema } from "@/schemas/patientSchema";
 import { usePermissions } from "@/hooks/usePermissions";
+import { exportPatientsToExcel } from "@/utils/exportPatientsToExcel";
 
 const MySwal = withReactContent(Swal);
 
@@ -129,9 +131,7 @@ export default function PatientDataTable({
 
   // Kolom default jika data kosong (untuk menampilkan header)
   const effectiveColumns = useMemo(() => {
-    if (columns.length > 0) return columns;
-    // Default urutan header sesuai Google Sheet (termasuk rujukan)
-    return [
+    const rawColumns = columns.length > 0 ? columns : [
       "TANGGAL",
       "HARI",
       "BULAN",
@@ -161,6 +161,12 @@ export default function PatientDataTable({
       "DIRUJUK_BALIK_FKRTL_PB",
       "DIRUJUK_BALIK_FKRTL_PL",
     ];
+    return rawColumns.filter(
+      (col) =>
+        col !== "TIPE_DAFTAR" &&
+        col !== "Tipe Daftar" &&
+        col !== "TIPE DAFTAR"
+    );
   }, [columns]);
 
   const formatDate = (dateString: string) => {
@@ -605,6 +611,7 @@ export default function PatientDataTable({
       NAMA: String(p.NAMA || ""),
       USIA: String(p.USIA || ""),
       NIP: String(p.NIP || ""),
+      TIPE_DAFTAR: String(p["Tipe Daftar"] || p.TIPE_DAFTAR || p["TIPE_DAFTAR"] || p["TIPE DAFTAR"] || "Offline"),
       OBS_TTV: String(p["OBS TTV"] || p.OBS_TTV || ""),
       KELUHAN: String(p.KELUHAN || ""),
       DIAGNOSIS: String(p.DIAGNOSIS || ""),
@@ -685,6 +692,11 @@ export default function PatientDataTable({
       payload["16-15"] = payload["16-15"] || "";
       payload["TINDAKAN"] = formData.TINDAKAN || "";
       payload["TINDAKAN "] = formData.TINDAKAN || "";
+      
+      // Map TIPE_DAFTAR to multiple formats for Google Sheet header compatibility
+      payload["Tipe Daftar"] = formData.TIPE_DAFTAR || "Offline";
+      payload["TIPE_DAFTAR"] = formData.TIPE_DAFTAR || "Offline";
+      payload["TIPE DAFTAR"] = formData.TIPE_DAFTAR || "Offline";
 
       if (formMode === "add") {
         let targetSheet: string | undefined = undefined;
@@ -752,6 +764,37 @@ export default function PatientDataTable({
     }
   };
 
+  const handleExportPatients = async () => {
+    try {
+      MySwal.fire({
+        title: "Sedang mengekspor...",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      await exportPatientsToExcel({
+        patients: filteredAndSortedData as PatientData[],
+        sheetName,
+        poliType,
+      });
+
+      Swal.close();
+      Toast.fire({
+        icon: "success",
+        title: "Data pasien berhasil diekspor ke Excel",
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.close();
+      Toast.fire({
+        icon: "error",
+        title: "Gagal mengekspor data pasien",
+      });
+    }
+  };
+
   return (
     <Box>
       {/* Table Header Section */}
@@ -780,6 +823,25 @@ export default function PatientDataTable({
           }}
         >
           DATA TERBARU
+        </Button>
+        <Button
+          variant="outlined"
+          color="success"
+          onClick={handleExportPatients}
+          startIcon={<FileDownloadIcon />}
+          sx={{
+            borderColor: "#22C55E",
+            color: "#22C55E",
+            "&:hover": {
+              borderColor: "#16a34a",
+              backgroundColor: "rgba(34, 197, 94, 0.08)",
+            },
+            boxShadow: "0 2px 4px 0 rgba(34, 197, 94, 0.2)",
+            px: 3,
+            fontWeight: 700,
+          }}
+        >
+          EXPORT EXCEL
         </Button>
         {canCreate && (
           <Button
@@ -1374,6 +1436,54 @@ export default function PatientDataTable({
                           "NAMA",
                         ].includes(column);
 
+                        if (column === "NAMA") {
+                          const tipeDaftar = String(
+                            (row as any).TIPE_DAFTAR ||
+                              (row as any)["Tipe Daftar"] ||
+                              (row as any)["TIPE DAFTAR"] ||
+                              "Offline"
+                          ).trim();
+                          const isOnline = tipeDaftar.toLowerCase() === "online";
+                          const dotColor = isOnline ? "#22C55E" : "#94A3B8";
+                          const labelText = isOnline ? "Online" : "Offline";
+
+                          return (
+                            <TableCell
+                              key={column}
+                              align={columnAlign}
+                              sx={{
+                                color: "black",
+                                py: 1.5,
+                                minWidth: columnWidth,
+                                maxWidth: columnWidth,
+                                whiteSpace: "normal",
+                                wordWrap: "break-word",
+                                overflow: "hidden",
+                                fontSize: "12.75px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Tooltip title={`Pendaftaran ${labelText}`}>
+                                  <Box
+                                    sx={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: "50%",
+                                      backgroundColor: dotColor,
+                                      flexShrink: 0,
+                                      boxShadow: isOnline
+                                        ? "0 0 6px #22C55E"
+                                        : "none",
+                                    }}
+                                  />
+                                </Tooltip>
+                                <span>{String(cellValue)}</span>
+                              </Box>
+                            </TableCell>
+                          );
+                        }
+
                         return (
                           <TableCell
                             key={column}
@@ -1391,7 +1501,7 @@ export default function PatientDataTable({
                                 : "normal",
                               overflow: "hidden",
                               fontSize: "12.75px",
-                              fontWeight: column === "NAMA" ? 700 : 400,
+                              fontWeight: 400,
                             }}
                           >
                             {String(cellValue)}

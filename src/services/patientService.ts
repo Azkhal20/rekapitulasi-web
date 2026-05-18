@@ -13,6 +13,7 @@ export interface PatientData {
   NAMA: string;
   USIA: string;
   NIP: string;
+  TIPE_DAFTAR?: string;
   OBS_TTV: string;
   KELUHAN: string;
   DIAGNOSIS: string;

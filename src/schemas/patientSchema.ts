@@ -24,6 +24,7 @@ export const PatientSchema = z.object({
   NAMA: z.string().min(1, "Nama pasien wajib diisi"),
   USIA: z.string().optional(), // Often calculated or just a string
   NIP: z.string().optional(),
+  TIPE_DAFTAR: z.string().optional(),
   OBS_TTV: z.string().optional(),
   KELUHAN: z.string().optional(),
   DIAGNOSIS: z.string().optional(),
