@@ -423,7 +423,7 @@ export default function PatientFormDialog({
           ...convertedData,
           BARU: String(initialData.BARU || ""),
           LAMA: String(initialData.LAMA || ""),
-          TIPE_DAFTAR: String(initialData.TIPE_DAFTAR || (initialData as any)["Tipe Daftar"] || "Offline"),
+          TIPE_DAFTAR: String(initialData.TIPE_DAFTAR || (initialData as Record<string, unknown>)["Tipe Daftar"] || "Offline"),
         });
       } else {
         // ADD Mode
