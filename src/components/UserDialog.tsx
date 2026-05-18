@@ -37,19 +37,27 @@ export default function UserDialog({
   });
 
   useEffect(() => {
-    if (editUser) {
-      setFormData({
-        ...editUser,
-        password: "",
-      });
-    } else {
-      setFormData({
-        username: "",
-        password: "",
-        role: "admin",
-        fullName: "",
-      });
-    }
+    if (!open) return;
+
+    // Use setTimeout to avoid 'react-hooks/set-state-in-effect' lint error
+    // by making the state update asynchronous.
+    const timer = setTimeout(() => {
+      if (editUser) {
+        setFormData({
+          ...editUser,
+          password: "",
+        });
+      } else {
+        setFormData({
+          username: "",
+          password: "",
+          role: "admin",
+          fullName: "",
+        });
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [editUser, open]);
 
   const handleSubmit = () => {

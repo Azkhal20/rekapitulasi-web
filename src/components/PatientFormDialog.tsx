@@ -16,6 +16,10 @@ import {
   Typography,
   Autocomplete,
   createFilterOptions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import icd10Data from "@/data/icd10.json";
 import CloseIcon from "@mui/icons-material/Close";
@@ -191,6 +195,7 @@ export default function PatientFormDialog({
     NAMA: "",
     USIA: "",
     NIP: "",
+    TIPE_DAFTAR: "Offline",
     OBS_TTV: "",
     KELUHAN: "",
     DIAGNOSIS: "",
@@ -418,6 +423,7 @@ export default function PatientFormDialog({
           ...convertedData,
           BARU: String(initialData.BARU || ""),
           LAMA: String(initialData.LAMA || ""),
+          TIPE_DAFTAR: String(initialData.TIPE_DAFTAR || (initialData as unknown as Record<string, string>)["Tipe Daftar"] || "Offline"),
         });
       } else {
         // ADD Mode
@@ -438,6 +444,7 @@ export default function PatientFormDialog({
           NAMA: "",
           USIA: "",
           NIP: "",
+          TIPE_DAFTAR: "Offline",
           OBS_TTV: "",
           KELUHAN: "",
           DIAGNOSIS: "",
@@ -718,6 +725,19 @@ export default function PatientFormDialog({
               fullWidth
             />
 
+            <FormControl fullWidth>
+              <InputLabel id="tipe-daftar-label">Tipe Pendaftaran</InputLabel>
+              <Select
+                labelId="tipe-daftar-label"
+                value={formData.TIPE_DAFTAR || "Offline"}
+                label="Tipe Pendaftaran"
+                onChange={(e) => handleChange("TIPE_DAFTAR", e.target.value)}
+              >
+                <MenuItem value="Offline">Offline</MenuItem>
+                <MenuItem value="Online">Online</MenuItem>
+              </Select>
+            </FormControl>
+
             {/* Medis Section */}
             <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" }, mt: 1 }}>
               <Typography
@@ -896,8 +916,36 @@ export default function PatientFormDialog({
               label="Tindakan"
               value={formData.TINDAKAN}
               onChange={(e) => handleChange("TINDAKAN", e.target.value)}
+              onFocus={() => {
+                if (!formData.TINDAKAN) {
+                  setFormData((prev) => ({ ...prev, TINDAKAN: "1. " }));
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  const lines = formData.TINDAKAN.split("\n").filter(
+                    (l) => l.trim() !== "",
+                  );
+                  if (lines.length > 0) {
+                    e.preventDefault();
+                    const nextNum = lines.length + 1;
+                    const lastLine = lines[lines.length - 1];
+                    const hasTrailingNumber = /^\d+\.\s*$/.test(lastLine);
+
+                    if (!hasTrailingNumber) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        TINDAKAN: prev.TINDAKAN.trimEnd() + `\n${nextNum}. `,
+                      }));
+                    }
+                  }
+                }
+              }}
               fullWidth
+              multiline
+              rows={3}
               placeholder="Terapi Medis / Tindakan"
+              sx={{ gridColumn: { xs: "1fr", sm: "span 2" } }}
             />
 
             <TextField
