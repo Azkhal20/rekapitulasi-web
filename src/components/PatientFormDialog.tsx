@@ -16,6 +16,10 @@ import {
   Typography,
   Autocomplete,
   createFilterOptions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import icd10Data from "@/data/icd10.json";
 import CloseIcon from "@mui/icons-material/Close";
@@ -191,6 +195,7 @@ export default function PatientFormDialog({
     NAMA: "",
     USIA: "",
     NIP: "",
+    TIPE_DAFTAR: "Offline",
     OBS_TTV: "",
     KELUHAN: "",
     DIAGNOSIS: "",
@@ -418,6 +423,7 @@ export default function PatientFormDialog({
           ...convertedData,
           BARU: String(initialData.BARU || ""),
           LAMA: String(initialData.LAMA || ""),
+          TIPE_DAFTAR: String(initialData.TIPE_DAFTAR || (initialData as unknown as Record<string, string>)["Tipe Daftar"] || "Offline"),
         });
       } else {
         // ADD Mode
@@ -438,6 +444,7 @@ export default function PatientFormDialog({
           NAMA: "",
           USIA: "",
           NIP: "",
+          TIPE_DAFTAR: "Offline",
           OBS_TTV: "",
           KELUHAN: "",
           DIAGNOSIS: "",
@@ -717,6 +724,19 @@ export default function PatientFormDialog({
               onChange={(e) => handleChange("NIP", e.target.value)}
               fullWidth
             />
+
+            <FormControl fullWidth>
+              <InputLabel id="tipe-daftar-label">Tipe Pendaftaran</InputLabel>
+              <Select
+                labelId="tipe-daftar-label"
+                value={formData.TIPE_DAFTAR || "Offline"}
+                label="Tipe Pendaftaran"
+                onChange={(e) => handleChange("TIPE_DAFTAR", e.target.value)}
+              >
+                <MenuItem value="Offline">Offline</MenuItem>
+                <MenuItem value="Online">Online</MenuItem>
+              </Select>
+            </FormControl>
 
             {/* Medis Section */}
             <Box sx={{ gridColumn: { xs: "1fr", sm: "span 2" }, mt: 1 }}>

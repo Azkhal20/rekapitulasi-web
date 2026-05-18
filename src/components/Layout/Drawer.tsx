@@ -196,24 +196,31 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
             return null;
 
           return (
-            <Box key={idx}>
+            <React.Fragment key={idx}>
               {open && (
-                <Typography
-                  variant="caption"
+                <Box
+                  component="li"
                   sx={{
+                    listStyle: "none",
+                    display: "block",
                     px: 2,
                     mt: 2,
                     mb: 1,
-                    display: "block",
-                    fontWeight: 700,
-                    color: "#475569",
-                    opacity: 1,
-                    fontSize: "0.75rem",
-                    letterSpacing: "0.5px",
                   }}
                 >
-                  {section.header}
-                </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 700,
+                      color: "#475569",
+                      opacity: 1,
+                      fontSize: "0.75rem",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    {section.header}
+                  </Typography>
+                </Box>
               )}
               {section.items.map((item) => {
                 if (item.children) {
@@ -223,13 +230,19 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                   );
 
                   return (
-                    <Box key={item.text}>
+                    <Box
+                      component="li"
+                      key={item.text}
+                      sx={{ listStyle: "none", display: "block" }}
+                    >
                       <ListItem
+                        component="div"
                         disablePadding
                         sx={{ display: "block", mb: 0.5 }}
                       >
                         <ListItemButton
                           onClick={() => handleGroupClick(item.text)}
+                          suppressHydrationWarning
                           sx={{
                             minHeight: 44,
                             justifyContent: open ? "initial" : "center",
@@ -280,6 +293,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                                 key={child.text}
                                 component={Link}
                                 href={child.href}
+                                suppressHydrationWarning
                                 sx={{
                                   minHeight: 40,
                                   pl: open ? 4 : 2.5,
@@ -336,6 +350,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                       component={Link}
                       href={item.href || "#"}
                       selected={isActive}
+                      suppressHydrationWarning
                       sx={{
                         minHeight: 44,
                         justifyContent: open ? "initial" : "center",
@@ -374,7 +389,7 @@ export default function Sidebar({ open, drawerWidth }: SidebarProps) {
                   </ListItem>
                 );
               })}
-            </Box>
+            </React.Fragment>
           );
         })}
       </List>
