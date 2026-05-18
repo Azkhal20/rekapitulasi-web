@@ -129,7 +129,7 @@ export const useAutoCalculate = (tanggal: string, poliType: PoliType, open: bool
         if (recordsInCycle.length > 0) {
           const maxVal = Math.max(
             ...recordsInCycle.map((r) => {
-              const row = r as Record<string, any>;
+              const row = r as unknown as Record<string, unknown>;
               const rawVal = row["16-15"] || row.ENAM_BELAS_LIMA_BELAS || "0";
               const val = parseInt(String(rawVal));
               return isNaN(val) ? 0 : val;

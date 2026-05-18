@@ -114,6 +114,7 @@ export default function Header({
             edge="start"
             onClick={handleDrawerToggle}
             sx={{ mr: 2 }}
+            suppressHydrationWarning
           >
             <MenuIcon />
           </IconButton>
@@ -147,6 +148,7 @@ export default function Header({
             </Box>
             <IconButton
               onClick={handleMenuOpen}
+              suppressHydrationWarning
               sx={{
                 p: 0,
                 "&:hover": {
